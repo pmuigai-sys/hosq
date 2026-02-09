@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyPositionChange } from '../lib/sms';
 
 export interface QueueEntry {
   id: string;
@@ -26,6 +27,7 @@ export interface QueueEntry {
 export function useQueueEntries(stageId?: string, status: string = 'waiting') {
   const [entries, setEntries] = useState<QueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const previousEntriesRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     fetchEntries();
@@ -70,7 +72,35 @@ export function useQueueEntries(stageId?: string, status: string = 'waiting') {
       const { data, error } = await query;
 
       if (error) throw error;
-      setEntries(data || []);
+
+      const newEntries = data || [];
+
+      newEntries.forEach((entry) => {
+        const previousPosition = previousEntriesRef.current.get(entry.id);
+        const currentPosition = entry.position_in_queue;
+
+        if (
+          previousPosition !== undefined &&
+          currentPosition !== null &&
+          previousPosition !== currentPosition &&
+          currentPosition < previousPosition
+        ) {
+          notifyPositionChange(
+            entry.id,
+            currentPosition,
+            entry.queue_number,
+            entry.queue_stages?.display_name || 'counter'
+          ).catch((err) =>
+            console.error('Error sending position change notification:', err)
+          );
+        }
+
+        if (currentPosition !== null) {
+          previousEntriesRef.current.set(entry.id, currentPosition);
+        }
+      });
+
+      setEntries(newEntries);
     } catch (error) {
       console.error('Error fetching queue entries:', error);
     } finally {

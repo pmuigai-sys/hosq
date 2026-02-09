@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQueueEntries, useQueueStages, useEmergencyFlags } from '../hooks/useQueue';
 import { supabase } from '../lib/supabase';
-import { notifyPatientStageChange } from '../lib/sms';
+import { notifyPatientStageChange, notifyPatientCalled, notifyPositionChange } from '../lib/sms';
 import {
   Users,
   Clock,
@@ -24,6 +24,9 @@ export function EmployeeDashboard() {
   const handleCallNext = async (entryId: string) => {
     setProcessingId(entryId);
     try {
+      const entry = entries.find((e) => e.id === entryId);
+      if (!entry) return;
+
       await supabase
         .from('queue_entries')
         .update({ status: 'in_service' })
@@ -34,6 +37,12 @@ export function EmployeeDashboard() {
         stage_id: selectedStage,
         served_by_user_id: userRole?.user_id,
       });
+
+      await notifyPatientCalled(
+        entryId,
+        entry.queue_stages?.display_name || 'counter',
+        entry.queue_number
+      );
 
       refresh();
     } catch (error) {
