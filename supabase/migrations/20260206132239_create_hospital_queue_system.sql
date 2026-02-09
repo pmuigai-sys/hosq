@@ -336,29 +336,28 @@ CREATE POLICY "Users can view their own role"
   TO authenticated
   USING (user_id = auth.uid());
 
+-- Helper function to check admin status without recursion
+CREATE OR REPLACE FUNCTION check_is_admin()
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+    AND role = 'admin'
+    AND is_active = true
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE POLICY "Admins can view all roles"
   ON user_roles FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles ur
-      WHERE ur.user_id = auth.uid()
-      AND ur.role = 'admin'
-      AND ur.is_active = true
-    )
-  );
+  USING (check_is_admin());
 
 CREATE POLICY "Admins can manage roles"
   ON user_roles FOR ALL
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.user_id = auth.uid()
-      AND user_roles.role = 'admin'
-      AND user_roles.is_active = true
-    )
-  );
+  USING (check_is_admin());
 
 -- RLS Policies for sms_logs
 CREATE POLICY "Authenticated users can view SMS logs"
