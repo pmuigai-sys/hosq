@@ -4,6 +4,7 @@
 
 | Version | Date       | Major Changes                                   | Tag      |
 | ------- | ---------- | ----------------------------------------------- | -------- |
+| v1.0.1  | 2026-02-09 | Comprehensive documentation and remote sync     | [v1.0.1] |
 | v1.0.0  | 2026-02-06 | Initial Release of Hospital Queue System (Hosq) | [v1.0.0] |
 
 ## Release Process
@@ -15,4 +16,4 @@
 
 ---
 *Author: Peter Thairu Muigai*
-*Version: 1.0.0*
+*Version: 1.0.1*

@@ -10,15 +10,15 @@ Pull the latest changes from the remote repository, resolve any merge conflicts 
 - **Documentation**: Extensive documentation exists in `docs/` but needs commitment.
 
 ## Step-by-Step Plan
-1. **Initial Commit**: Stage and commit all current local changes to ensure a clean state before pulling (or to have a commit to merge against).
-2. **Fetch and Pull**: Execute `git pull origin main`.
-3. **Conflict Resolution**:
-    - Identify conflicting files.
-    - Analyze the code in both local and remote versions.
-    - Resolve conflicts logically, prioritizing functional integrity and the user's stack requirements (React + Electron + Ionic + Instant DB).
-4. **Final Commit**: Commit the resolved conflicts.
-5. **Verification**: Check if the application builds and runs (if applicable).
-6. **Documentation Update**: Update `docs/releases.md` with the merge activity if appropriate.
+1. [x] **Initial Commit**: Stage and commit all current local changes.
+2. [x] **Fetch and Pull**: Execute `git pull origin main --rebase`.
+3. [ ] **Conflict Resolution**:
+    - [x] Identify conflicting files (None found during rebase).
+    - [x] Analyze the code (Verification in progress).
+    - [ ] Resolve conflicts logically (Skipped as no conflicts occurred).
+4. [ ] **Final Commit**: (Completed via rebase if no conflicts).
+5. [ ] **Verification**: Check if the application builds and runs (Running `npm run build`).
+6. [ ] **Documentation Update**: Update `docs/releases.md` with the merge activity.
 
 ## Assumptions & Risks
 - **Assumptions**: The remote changes are compatible with the core stack.

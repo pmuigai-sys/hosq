@@ -33,15 +33,15 @@ A comprehensive real-time hospital queuing system with patient self-service, SMS
 
 | Topic                           | Description                             | Link                                                                                     | Last Updated |
 | ------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------- | ------------ |
-| Architecture                    | System design and component overview    | [docs/architecture.md](./docs/architecture.md)                                           | 2026-02-06   |
-| Developer Workflows             | Setup, build, test, and deployment      | [docs/workflows.md](./docs/workflows.md)                                                 | 2026-02-06   |
-| Code Conventions                | Naming, style, and structure guidelines | [docs/conventions.md](./docs/conventions.md)                                             | 2026-02-06   |
-| Integrations                    | APIs, databases, and environment config | [docs/integrations.md](./docs/integrations.md)                                           | 2026-02-06   |
-| Releases                        | Changelog and release process           | [docs/releases.md](./docs/releases.md)                                                   | 2026-02-06   |
-| Testing & Quality Assurance     | Tests, coverage, tools                  | [docs/testing-and-quality-assurance.md](./docs/testing-and-quality-assurance.md)         | 2026-02-06   |
-| Deployment & CI/CD              | Pipelines and infrastructure setup      | [docs/deployment-and-cicd.md](./docs/deployment-and-cicd.md)                             | 2026-02-06   |
-| Collaboration & Version Control | Branching, PRs, best practices          | [docs/collaboration-and-version-control.md](./docs/collaboration-and-version-control.md) | 2026-02-06   |
-| Error Handling & Logging        | Patterns, monitoring, and known issues  | [docs/error-handling-and-logging.md](./docs/error-handling-and-logging.md)               | 2026-02-06   |
+| Architecture                    | System design and component overview    | [docs/architecture.md](./docs/architecture.md)                                           | 2026-02-09   |
+| Developer Workflows             | Setup, build, test, and deployment      | [docs/workflows.md](./docs/workflows.md)                                                 | 2026-02-09   |
+| Code Conventions                | Naming, style, and structure guidelines | [docs/conventions.md](./docs/conventions.md)                                             | 2026-02-09   |
+| Integrations                    | APIs, databases, and environment config | [docs/integrations.md](./docs/integrations.md)                                           | 2026-02-09   |
+| Releases                        | Changelog and release process           | [docs/releases.md](./docs/releases.md)                                                   | 2026-02-09   |
+| Testing & Quality Assurance     | Tests, coverage, tools                  | [docs/testing-and-quality-assurance.md](./docs/testing-and-quality-assurance.md)         | 2026-02-09   |
+| Deployment & CI/CD              | Pipelines and infrastructure setup      | [docs/deployment-and-cicd.md](./docs/deployment-and-cicd.md)                             | 2026-02-09   |
+| Collaboration & Version Control | Branching, PRs, best practices          | [docs/collaboration-and-version-control.md](./docs/collaboration-and-version-control.md) | 2026-02-09   |
+| Error Handling & Logging        | Patterns, monitoring, and known issues  | [docs/error-handling-and-logging.md](./docs/error-handling-and-logging.md)               | 2026-02-09   |
 
 ## Setup Instructions
 
