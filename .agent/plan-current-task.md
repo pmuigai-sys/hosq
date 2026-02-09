@@ -12,13 +12,12 @@ Pull the latest changes from the remote repository, resolve any merge conflicts 
 ## Step-by-Step Plan
 1. [x] **Initial Commit**: Stage and commit all current local changes.
 2. [x] **Fetch and Pull**: Execute `git pull origin main --rebase`.
-3. [ ] **Conflict Resolution**:
-    - [x] Identify conflicting files (None found during rebase).
-    - [x] Analyze the code (Verification in progress).
-    - [ ] Resolve conflicts logically (Skipped as no conflicts occurred).
-4. [ ] **Final Commit**: (Completed via rebase if no conflicts).
-5. [ ] **Verification**: Check if the application builds and runs (Running `npm run build`).
-6. [ ] **Documentation Update**: Update `docs/releases.md` with the merge activity.
+3. [x] **Conflict Resolution**: (Completed).
+4. [x] **Verification**: (Completed via `npm run build`).
+5. [x] **Documentation Update**: (Completed).
+6. [x] **Push to Feature Branch**: Created `feature/docs-and-refactor-sync` and pushed.
+7. [ ] **Merge to Main**: Merge the feature branch into `main` and push to `origin`.
+8. [ ] **Cleanup**: Delete the feature branch locally and remotely.
 
 ## Assumptions & Risks
 - **Assumptions**: The remote changes are compatible with the core stack.
