@@ -174,9 +174,11 @@ CREATE TABLE IF NOT EXISTS patient_emergency_flags (
 CREATE TABLE IF NOT EXISTS user_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users(id) UNIQUE NOT NULL,
+  email text NOT NULL,
   role text NOT NULL,
   department text,
   is_active boolean DEFAULT true,
+  email_verified boolean DEFAULT false,
   created_at timestamptz DEFAULT now()
 );
 

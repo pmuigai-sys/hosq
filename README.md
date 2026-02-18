@@ -42,6 +42,8 @@ A comprehensive real-time hospital queuing system with patient self-service, SMS
 | Deployment & CI/CD              | Pipelines and infrastructure setup      | [docs/deployment-and-cicd.md](./docs/deployment-and-cicd.md)                             | 2026-02-09   |
 | Collaboration & Version Control | Branching, PRs, best practices          | [docs/collaboration-and-version-control.md](./docs/collaboration-and-version-control.md) | 2026-02-09   |
 | Error Handling & Logging        | Patterns, monitoring, and known issues  | [docs/error-handling-and-logging.md](./docs/error-handling-and-logging.md)               | 2026-02-09   |
+| Twilio Configuration            | Verifying numbers for trial accounts    | [docs/twilio-configuration.md](./docs/twilio-configuration.md)                           | 2026-02-16   |
+| SMS Alternatives                | Local providers for the Kenyan market   | [docs/sms-alternatives.md](./docs/sms-alternatives.md)                                   | 2026-02-16   |
 
 ## Setup Instructions
 

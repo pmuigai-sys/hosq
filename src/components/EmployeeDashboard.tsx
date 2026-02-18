@@ -18,8 +18,11 @@ export function EmployeeDashboard() {
   const { stages } = useQueueStages();
   const { flags } = useEmergencyFlags();
   const [selectedStage, setSelectedStage] = useState<string>('');
-  const { entries, refresh } = useQueueEntries(selectedStage || undefined, 'waiting');
+  const [showCompleted, setShowCompleted] = useState(false);
+  const { entries, refresh } = useQueueEntries(selectedStage || undefined, 'all');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const activeEntries = entries.filter((entry) => entry.status !== 'completed' && entry.status !== 'cancelled');
+  const visibleEntries = showCompleted ? entries : activeEntries;
 
   const handleCallNext = async (entryId: string) => {
     setProcessingId(entryId);
@@ -32,9 +35,14 @@ export function EmployeeDashboard() {
         .update({ status: 'in_service' })
         .eq('id', entryId);
 
+      const stageId = entry.current_stage_id || selectedStage;
+      if (!stageId) {
+        throw new Error('Missing stage id for queue history');
+      }
+
       await supabase.from('queue_history').insert({
         queue_entry_id: entryId,
-        stage_id: selectedStage,
+        stage_id: stageId,
         served_by_user_id: userRole?.user_id,
       });
 
@@ -140,7 +148,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Waiting</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {entries.filter((e) => e.status === 'waiting').length}
+                  {activeEntries.filter((e) => e.status === 'waiting').length}
                 </p>
               </div>
               <Clock className="w-8 h-8 text-blue-600" />
@@ -152,7 +160,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">In Service</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {entries.filter((e) => e.status === 'in_service').length}
+                  {activeEntries.filter((e) => e.status === 'in_service').length}
                 </p>
               </div>
               <Users className="w-8 h-8 text-green-600" />
@@ -164,7 +172,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Priority Cases</p>
                 <p className="text-3xl font-bold text-red-600">
-                  {entries.filter((e) => e.has_emergency_flag).length}
+                  {activeEntries.filter((e) => e.has_emergency_flag).length}
                 </p>
               </div>
               <AlertTriangle className="w-8 h-8 text-red-600" />
@@ -176,7 +184,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Total Today</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {entries.length}
+                  {activeEntries.length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-gray-600" />
@@ -201,6 +209,15 @@ export function EmployeeDashboard() {
                 </option>
               ))}
             </select>
+            <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={showCompleted}
+                onChange={(e) => setShowCompleted(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Show completed/cancelled
+            </label>
           </div>
         </div>
 
@@ -214,6 +231,9 @@ export function EmployeeDashboard() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Patient
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Reason
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Stage
@@ -230,14 +250,14 @@ export function EmployeeDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {entries.length === 0 ? (
+                {visibleEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                       No patients in queue
                     </td>
                   </tr>
                 ) : (
-                  entries.map((entry) => (
+                  visibleEntries.map((entry) => (
                     <tr
                       key={entry.id}
                       className={entry.has_emergency_flag ? 'bg-red-50' : ''}
@@ -266,12 +286,12 @@ export function EmployeeDashboard() {
                               {entry.patients?.phone_number}
                             </span>
                           </div>
-                          {entry.patients?.visit_reason && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              {entry.patients.visit_reason}
-                            </p>
-                          )}
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-700">
+                          {entry.patients?.visit_reason || 'Not provided'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900">

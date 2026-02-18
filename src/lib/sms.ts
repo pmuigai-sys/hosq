@@ -13,6 +13,7 @@ export async function sendSMS(
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -27,7 +28,15 @@ export async function sendSMS(
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to send SMS' };
+      const detail =
+        data?.details?.message ||
+        data?.details?.error_message ||
+        data?.details?.more_info ||
+        (data?.details ? JSON.stringify(data.details) : '');
+      const errorMessage = [data?.error || 'Failed to send SMS', detail]
+        .filter(Boolean)
+        .join(' - ');
+      return { success: false, error: errorMessage };
     }
 
     return { success: true };

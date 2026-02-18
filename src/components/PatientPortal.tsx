@@ -79,12 +79,16 @@ export function PatientPortal() {
         stage_id: firstStage.id,
       });
 
-      await sendSMS(
+      const smsResult = await sendSMS(
         formData.phoneNumber,
         `Hello ${formData.fullName}, you have been registered with queue number ${queueEntry.queue_number}. You are at ${firstStage.display_name}. Track your status at this page.`,
         patientId,
         queueEntry.id
       );
+      if (!smsResult.success) {
+        console.warn('SMS send failed:', smsResult.error);
+        setError(smsResult.error || 'SMS failed to send. Please verify SMS configuration.');
+      }
 
       setQueueEntryId(queueEntry.id);
       setQueueNumber(queueEntry.queue_number);
@@ -120,6 +124,12 @@ export function PatientPortal() {
               Track your position in real-time below. You'll receive SMS notifications when it's your turn.
             </p>
           </div>
+          {error && (
+            <div className="flex items-center gap-2 text-yellow-700 bg-yellow-50 p-3 rounded-lg mb-4">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
 
           <button
             onClick={() => {

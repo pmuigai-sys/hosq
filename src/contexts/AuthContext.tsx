@@ -8,6 +8,7 @@ interface UserRole {
   role: string;
   department: string | null;
   is_active: boolean;
+  email_verified: boolean;
 }
 
 interface AuthContextType {
@@ -85,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isAdmin = userRole?.role === 'admin';
-  const isStaff = userRole !== null;
+  const isStaff = userRole !== null && (userRole.role === 'admin' || userRole.email_verified === true);
 
   return (
     <AuthContext.Provider

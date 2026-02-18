@@ -184,25 +184,31 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          email: string
           role: string
           department: string | null
           is_active: boolean
+          email_verified: boolean
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
+          email: string
           role: string
           department?: string | null
           is_active?: boolean
+          email_verified?: boolean
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
+          email?: string
           role?: string
           department?: string | null
           is_active?: boolean
+          email_verified?: boolean
           created_at?: string
         }
       }

@@ -27,6 +27,13 @@ The Twilio credentials are automatically configured in your Supabase Edge Functi
 
 These are pre-configured in the Supabase environment.
 
+#### Important: Using a Trial Account
+If you are using a **Twilio Trial Account**, you must manually verify any recipient phone number before you can send an SMS to it:
+1. Go to [Twilio Console > Verified Caller IDs](https://console.twilio.com/us1/develop/phone-numbers/manage/verified).
+2. Click **Add a new Caller ID**.
+3. Enter the number and verify it via SMS code.
+4. For more details, see the [Twilio Configuration Guide](./docs/twilio-configuration.md).
+
 ### Step 3: Create Your First Admin User
 
 1. Go to your Supabase Dashboard

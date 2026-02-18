@@ -61,9 +61,12 @@ export function useQueueEntries(stageId?: string, status: string = 'waiting') {
           patients(full_name, phone_number, age, visit_reason),
           queue_stages(display_name, name)
         `)
-        .eq('status', status)
         .order('has_emergency_flag', { ascending: false })
         .order('checked_in_at', { ascending: true });
+
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      }
 
       if (stageId) {
         query = query.eq('current_stage_id', stageId);

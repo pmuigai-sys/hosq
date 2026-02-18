@@ -18,7 +18,10 @@ The primary backend service powering Hosq.
 The system notifies patients via SMS when their queue status changes.
 
 - **Mechanism**: Outbound HTTP calls via Supabase Edge Functions.
-- **Provider**: Twilio or similar (configured within the Edge Function).
+- **Provider**: Africa's Talking (Primary for Kenyan/African market).
+- **Environment Variables**:
+  - `AFRICA_STALKING_API_KEY`: Your API key from the AT dashboard.
+  - `AFRICA_STALKING_USERNAME`: Your username (or 'sandbox' for testing).
 - **Function**: `v1/send-sms`
 
 ## Icons (Lucide-React)

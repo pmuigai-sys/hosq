@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AlertCircle, Loader2, Lock, Mail } from 'lucide-react';
 
 export function Login() {
-  const { signIn } = useAuth();
+  const { signIn, user, userRole } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,11 +17,38 @@ export function Login() {
     try {
       await signIn(email, password);
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
   };
+
+  // If user is logged in but role/verification is missing
+  if (user && (!userRole || (userRole.role !== 'admin' && !userRole.email_verified))) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-4">
+            <AlertCircle className="w-8 h-8 text-yellow-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Verification Pending
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Your account has been created but is awaiting administrator verification.
+            Please contact your administrator to activate your access.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Check Status Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">

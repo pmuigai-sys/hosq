@@ -1,10 +1,15 @@
+// Allow unauthenticated calls from the patient self-serve flow.
+export const config = {
+  verify_jwt: false,
+};
+
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, apikey",
 };
 
 interface SMSRequest {
@@ -12,6 +17,7 @@ interface SMSRequest {
   message: string;
   patientId?: string;
   queueEntryId?: string;
+  forcedUsername?: string; // Added for diagnostics
 }
 
 Deno.serve(async (req: Request) => {
@@ -24,18 +30,20 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = Deno.env.get("SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioPhoneNumber = Deno.env.get("TWILIO_PHONE_NUMBER");
+    const apiKey = Deno.env.get("AFRICA_STALKING_API_KEY")?.trim();
+    // Use forcedUsername if provided (for diagnostics), otherwise default to secret
+    const body = await req.json().catch(() => ({}));
+    const usernameFromEnv = Deno.env.get("AFRICA_STALKING_USERNAME")?.trim() || "sandbox";
+    const username = (body.forcedUsername || usernameFromEnv).trim();
 
-    if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+    if (!apiKey) {
       return new Response(
         JSON.stringify({
-          error: "Twilio credentials not configured",
-          details: "Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER environment variables",
+          error: "Africa's Talking API key not configured",
+          details: "Please set AFRICA_STALKING_API_KEY and AFRICA_STALKING_USERNAME environment variables",
         }),
         {
           status: 500,
@@ -44,7 +52,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { to, message, patientId, queueEntryId }: SMSRequest = await req.json();
+    const { to, message, patientId, queueEntryId }: SMSRequest = body;
 
     if (!to || !message) {
       return new Response(
@@ -56,28 +64,59 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Africa's Talking requires E.164 (must start with +)
     const formattedPhone = to.startsWith("+") ? to : `+${to}`;
 
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
-    const basicAuth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
+    // Africa's Talking API Endpoint
+    const isSandbox = username.toLowerCase() === "sandbox";
+    const apiBase = isSandbox
+      ? "https://api.sandbox.africastalking.com"
+      : "https://api.africastalking.com";
+
+    const url = `${apiBase}/version1/messaging`;
 
     const formData = new URLSearchParams();
-    formData.append("To", formattedPhone);
-    formData.append("From", twilioPhoneNumber);
-    formData.append("Body", message);
+    formData.append("username", username);
+    formData.append("to", formattedPhone);
+    formData.append("message", message);
 
-    const twilioResponse = await fetch(twilioUrl, {
+    console.log(`Calling AT API: ${url} with username: ${username} (isSandbox: ${isSandbox})`);
+
+    const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Basic ${basicAuth}`,
+        "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
+        "apiKey": apiKey,
       },
       body: formData.toString(),
     });
 
-    const twilioData = await twilioResponse.json();
+    const bodyText = await response.text();
+    console.log(`AT API Response Raw: ${bodyText}`);
 
-    const logStatus = twilioResponse.ok ? "sent" : "failed";
+    let data;
+    try {
+      data = JSON.parse(bodyText);
+    } catch (e) {
+      console.error("Failed to parse Africa's Talking response as JSON:", bodyText);
+      return new Response(
+        JSON.stringify({
+          error: "Failed to parse provider response",
+          details: bodyText,
+          providerStatus: response.status,
+          usedUsername: username
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // AT response structure: data.SMSMessageData.Recipients[0]
+    const result = data.SMSMessageData?.Recipients?.[0];
+    const logStatus = result?.status === "Success" ? "sent" : "failed";
 
     await supabase.from("sms_logs").insert({
       patient_id: patientId || null,
@@ -85,17 +124,18 @@ Deno.serve(async (req: Request) => {
       phone_number: formattedPhone,
       message,
       status: logStatus,
-      twilio_sid: twilioData.sid || null,
+      twilio_sid: result?.messageId || null,
     });
 
-    if (!twilioResponse.ok) {
+    if (!response.ok || logStatus === "failed") {
       return new Response(
         JSON.stringify({
           error: "Failed to send SMS",
-          details: twilioData,
+          details: data,
+          usedUsername: username
         }),
         {
-          status: twilioResponse.status,
+          status: response.status === 201 ? 200 : response.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -104,8 +144,9 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        sid: twilioData.sid,
-        status: twilioData.status,
+        messageId: result?.messageId,
+        status: result?.status,
+        usedUsername: username
       }),
       {
         status: 200,
