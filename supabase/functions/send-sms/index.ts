@@ -17,7 +17,6 @@ interface SMSRequest {
   message: string;
   patientId?: string;
   queueEntryId?: string;
-  forcedUsername?: string; // Added for diagnostics
 }
 
 Deno.serve(async (req: Request) => {
@@ -33,17 +32,14 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const apiKey = Deno.env.get("AFRICA_STALKING_API_KEY")?.trim();
-    // Use forcedUsername if provided (for diagnostics), otherwise default to secret
-    const body = await req.json().catch(() => ({}));
-    const usernameFromEnv = Deno.env.get("AFRICA_STALKING_USERNAME")?.trim() || "sandbox";
-    const username = (body.forcedUsername || usernameFromEnv).trim();
+    const tokenId = Deno.env.get("BULKSMS_TOKEN_ID")?.trim();
+    const tokenSecret = Deno.env.get("BULKSMS_TOKEN_SECRET")?.trim();
 
-    if (!apiKey) {
+    if (!tokenId || !tokenSecret) {
       return new Response(
         JSON.stringify({
-          error: "Africa's Talking API key not configured",
-          details: "Please set AFRICA_STALKING_API_KEY and AFRICA_STALKING_USERNAME environment variables",
+          error: "BulkSMS.com credentials not configured",
+          details: "Please set BULKSMS_TOKEN_ID and BULKSMS_TOKEN_SECRET environment variables",
         }),
         {
           status: 500,
@@ -52,7 +48,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { to, message, patientId, queueEntryId }: SMSRequest = body;
+    const { to, message, patientId, queueEntryId }: SMSRequest = await req.json();
 
     if (!to || !message) {
       return new Response(
@@ -64,48 +60,47 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Africa's Talking requires E.164 (must start with +)
+    // BulkSMS requires E.164 (must start with +)
     const formattedPhone = to.startsWith("+") ? to : `+${to}`;
 
-    // Africa's Talking API Endpoint
-    const isSandbox = username.toLowerCase() === "sandbox";
-    const apiBase = isSandbox
-      ? "https://api.sandbox.africastalking.com"
-      : "https://api.africastalking.com";
+    // BulkSMS.com V1 API Endpoint
+    const url = "https://api.bulksms.com/v1/messages";
 
-    const url = `${apiBase}/version1/messaging`;
+    // Basic Auth Header (Base64 of tokenId:tokenSecret)
+    const authHeader = `Basic ${btoa(`${tokenId}:${tokenSecret}`)}`;
 
-    const formData = new URLSearchParams();
-    formData.append("username", username);
-    formData.append("to", formattedPhone);
-    formData.append("message", message);
+    const payload = [
+      {
+        to: formattedPhone,
+        body: message,
+      }
+    ];
 
-    console.log(`Calling AT API: ${url} with username: ${username} (isSandbox: ${isSandbox})`);
+    console.log(`Calling BulkSMS API: ${url} for recipient: ${formattedPhone}`);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Accept": "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "apiKey": apiKey,
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
       },
-      body: formData.toString(),
+      body: JSON.stringify(payload),
     });
 
     const bodyText = await response.text();
-    console.log(`AT API Response Raw: ${bodyText}`);
+    console.log(`BulkSMS API Response Raw: ${bodyText}`);
 
     let data;
     try {
       data = JSON.parse(bodyText);
     } catch (e) {
-      console.error("Failed to parse Africa's Talking response as JSON:", bodyText);
+      console.error("Failed to parse BulkSMS response as JSON:", bodyText);
       return new Response(
         JSON.stringify({
           error: "Failed to parse provider response",
           details: bodyText,
           providerStatus: response.status,
-          usedUsername: username
         }),
         {
           status: 502,
@@ -114,9 +109,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // AT response structure: data.SMSMessageData.Recipients[0]
-    const result = data.SMSMessageData?.Recipients?.[0];
-    const logStatus = result?.status === "Success" ? "sent" : "failed";
+    // BulkSMS V1 response is an array of message results
+    const result = data[0];
+    const logStatus = response.status >= 200 && response.status < 300 ? "sent" : "failed";
 
     await supabase.from("sms_logs").insert({
       patient_id: patientId || null,
@@ -124,18 +119,17 @@ Deno.serve(async (req: Request) => {
       phone_number: formattedPhone,
       message,
       status: logStatus,
-      twilio_sid: result?.messageId || null,
+      twilio_sid: result?.id || null, // Reusing column for external ID
     });
 
-    if (!response.ok || logStatus === "failed") {
+    if (!response.ok) {
       return new Response(
         JSON.stringify({
           error: "Failed to send SMS",
           details: data,
-          usedUsername: username
         }),
         {
-          status: response.status === 201 ? 200 : response.status,
+          status: response.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -144,9 +138,8 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        messageId: result?.messageId,
-        status: result?.status,
-        usedUsername: username
+        messageId: result?.id,
+        status: result?.status?.type,
       }),
       {
         status: 200,

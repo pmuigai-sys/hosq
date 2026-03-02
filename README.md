@@ -186,7 +186,7 @@ Messages include:
 
 - **Frontend**: React + TypeScript + Tailwind CSS
 - **Backend**: Supabase (PostgreSQL + Real-time + Auth + Edge Functions)
-- **SMS**: Twilio API
+- **SMS**: BulkSMS.com (Primary) / Africa's Talking (Legacy)
 - **Icons**: Lucide React
 
 ## Support
