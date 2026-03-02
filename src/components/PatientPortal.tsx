@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useQueueStages } from '../hooks/useQueue';
 import { sendSMS } from '../lib/sms';
 import { runAutoEmergencyTriage } from '../lib/auto-triage';
+import { normalizeKenyanPhone } from '../lib/phone';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 export function PatientPortal() {
@@ -27,11 +28,16 @@ export function PatientPortal() {
     setError('');
 
     try {
+      const normalizedPhone = normalizeKenyanPhone(formData.phoneNumber);
+      if (!normalizedPhone) {
+        throw new Error('Only Kenyan mobile numbers are allowed (e.g., +254712345678 or 0712345678).');
+      }
+
       let patientId = '';
       const { data: existingPatient } = await supabase
         .from('patients')
         .select('id')
-        .eq('phone_number', formData.phoneNumber)
+        .eq('phone_number', normalizedPhone)
         .maybeSingle();
 
       if (existingPatient) {
@@ -48,7 +54,7 @@ export function PatientPortal() {
         const { data: newPatient, error: patientError } = await supabase
           .from('patients')
           .insert({
-            phone_number: formData.phoneNumber,
+            phone_number: normalizedPhone,
             full_name: formData.fullName,
             age: formData.age ? parseInt(formData.age) : null,
             visit_reason: formData.visitReason,
@@ -92,7 +98,7 @@ export function PatientPortal() {
       }
 
       const smsResult = await sendSMS(
-        formData.phoneNumber,
+        normalizedPhone,
         `Hello ${formData.fullName}, you have been registered with queue number ${queueEntry.queue_number}. You are at ${firstStage.display_name}. Track your status at this page.`,
         patientId,
         queueEntry.id
@@ -202,7 +208,7 @@ export function PatientPortal() {
               placeholder="+1234567890"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Include country code (e.g., +1 for US)
+              Kenyan mobile numbers only (e.g., +254712345678 or 0712345678)
             </p>
           </div>
 

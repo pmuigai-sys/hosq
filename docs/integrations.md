@@ -36,6 +36,11 @@ Rule-based emergency detection runs during patient self-check-in and auto-applie
   - Sets `queue_entries.has_emergency_flag = true` for priority queueing.
   - Adds an audit note in `queue_entries.notes` with matched rules.
 
+## Check-In Abuse Protection
+- Kenyan number enforcement is applied at database level (`patients.phone_number` is normalized to `+254...` format).
+- Rate limiting is enforced at database level: one check-in per phone number every 6 hours within the same Nairobi day.
+- These protections apply even if a client bypasses frontend validation.
+
 ## Icons (Lucide-React)
 - **Library**: `lucide-react`
 - **Known Issue**: Some icons (like `Fingerprint`) may be blocked by client-side ad-blockers due to privacy heuristic checks. See [Error Handling](./error-handling-and-logging.md) for details.
