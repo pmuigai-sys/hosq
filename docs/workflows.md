@@ -45,6 +45,7 @@ The output will be in the `dist/` folder.
 - **Supabase Functions**: Deploy Edge Functions using the Supabase CLI:
   ```bash
   supabase functions deploy send-sms
+  supabase functions deploy auto-emergency-triage
   ```
 
 ## Quality Assurance
