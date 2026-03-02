@@ -19,6 +19,12 @@ interface SMSRequest {
   queueEntryId?: string;
 }
 
+function isSmsEnabled(value: unknown): boolean {
+  if (!value || typeof value !== "object") return true;
+  const enabled = (value as Record<string, unknown>).enabled;
+  return enabled !== false;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -60,6 +66,37 @@ Deno.serve(async (req: Request) => {
         }),
         {
           status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const settingsResponse = await fetch(
+      `${supabaseUrl}/rest/v1/system_settings?select=value&key=eq.sms_enabled&limit=1`,
+      {
+        method: "GET",
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+      }
+    );
+
+    if (!settingsResponse.ok) {
+      const details = await settingsResponse.text();
+      console.error("Failed to read sms_enabled setting via REST:", details);
+    }
+
+    const settingRows = settingsResponse.ok ? await settingsResponse.json() : [];
+    const settingValue = Array.isArray(settingRows) && settingRows.length > 0 ? settingRows[0]?.value : null;
+
+    if (!isSmsEnabled(settingValue)) {
+      return new Response(
+        JSON.stringify({
+          error: "SMS sending is currently disabled by administrator settings",
+        }),
+        {
+          status: 503,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );

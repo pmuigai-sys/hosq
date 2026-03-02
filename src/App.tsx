@@ -25,14 +25,14 @@ function AppContent() {
       <div className="min-h-screen bg-gray-50">
         <nav className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center gap-3">
+            <div className="min-h-16 py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <Activity className="w-8 h-8 text-blue-600" />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
                     Hospital Queue System
                   </h1>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs text-gray-600 truncate">
                     {userRole.role.charAt(0).toUpperCase() + userRole.role.slice(1)}
                     {userRole.department && ` - ${userRole.department}`}
                   </p>
@@ -40,7 +40,7 @@ function AppContent() {
               </div>
               <button
                 onClick={signOut}
-                className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out
@@ -57,14 +57,14 @@ function AppContent() {
     <div>
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+          <div className="min-h-16 py-3 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <Activity className="w-8 h-8 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
                 Hospital Queue System
               </h1>
             </div>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full lg:w-auto">
               <button
                 onClick={() => setView('patient')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
