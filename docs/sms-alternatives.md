@@ -1,55 +1,58 @@
 # SMS Service Alternatives (Kenya & Africa)
 
-Twilio is a global leader, but its trial restrictions and routing to African carriers (like Safaricom/Airtel) can be problematic for local projects. Below are the top recommended alternatives for the Kenyan market.
+Twilio and Africa's Talking have documentation that often assumes a registered business entity. For independent developers or project-based work, the registration and blacklisting (spam filters) can be problematic.
 
-## 1. Africa's Talking (Recommended)
-The industry standard for developers in Africa. They have direct integrations with Safaricom, Airtel, and Telkom.
+## Recommended Low-Friction Alternatives
 
-- **Why it's better**: 
-  - Extremely developer-friendly.
-  - No "Verified Caller ID" restrictions for your own development numbers.
-  - Better delivery rates to Safaricom/Airtel.
-  - Active sandbox for testing without spending money.
-- **Pricing**: Pay-as-you-go (approx. 0.8 KES to 1.0 KES per SMS).
-- **Website**: [africastalking.com](https://africastalking.com)
+### 1. BulkSMS.com (Global / Shared Shortcode)
+A reliable platform that allows pay-as-you-go credit with minimal overhead.
 
-## 2. Wingu SMS
-A highly reliable local provider with a modern API and excellent dashboard.
+-   **Why it's better**:
+    -   Requires simple ID verification (personal), not a full business registration.
+    -   Uses **Shared Shortcodes** by default for many regions, which improves delivery to Safaricom/Airtel without needing to register a "Sender ID".
+-   **Pricing**: Competitive pay-as-you-go rates.
+-   **Website**: [bulksms.com](https://www.bulksms.com)
 
-- **Why it's better**:
-  - 99.9% delivery rate to Kenyan networks.
-  - Direct local support.
-  - Very simple REST API.
-- **Website**: [wingusms.com](https://wingusms.com)
+### 2. ClickSend
+A modern SMS API provider known for its flexibility and ease of setup.
 
-## 3. Advanta Africa
-A robust enterprise-grade solution that is very popular for bulk SMS and transactional alerts in Kenya.
+-   **Why it's better**:
+    -   Offers **Shared Numbers** (Long Codes) and **Shortcodes**.
+    -   Transparent pay-as-you-go pricing with no monthly subscription.
+    -   Excellent documentation for various programming languages.
+-   **Website**: [clicksend.com](https://www.clicksend.com)
 
-- **Why it's better**:
-  - Competitive pricing for bulk.
-  - Support for custom alphanumeric Sender IDs.
-- **Website**: [advantaafrica.com](https://advantaafrica.com)
+### 3. Sema (Local Kenya)
+Sema (by Advanta) is a developer-centric SMS gateway specifically for the Kenyan market.
+
+-   **Why it's better**:
+    -   Direct local support.
+    -   Allows you to start sending using a **Shared Shortcode** (e.g., 22384) while you wait.
+    -   Very simple REST API tailored for local use cases.
+-   **Website**: [sema.co.ke](https://sema.co.ke)
+
+---
+
+## Strategy: Avoiding Blacklisting without Business Registration
+
+If you are a student or an independent developer, the biggest hurdle is the **Sender ID** (e.g., "HOSPITAL"). Safaricom blocks any alphanumeric sender ID that hasn't been explicitly registered (which requires business docs).
+
+**To bypass this:**
+1.  **Use a Shared Shortcode**: Instead of your own name, the SMS will come from a number (e.g., 22123). Providers like BulkSMS and Sema offer this out of the box.
+2.  **Verify your Account via Personal ID**: Most providers accept a scanned ID card or Passport for account verification instead of a Business Certificate.
+3.  **Opt for Pay-as-you-go**: Avoid "monthly plans" or "subscriptions" that require recurring credit card charges.
 
 ---
 
 ## Comparison Summary
 
-| Feature                | Twilio (Trial)             | Africa's Talking  | Wingu SMS         |
-| :--------------------- | :------------------------- | :---------------- | :---------------- |
-| **Kenyan Delivery**    | Poor/Restricted            | **Excellent**     | **Excellent**     |
-| **Trial Restrictions** | High (Must verify every #) | Low (Use Sandbox) | Low               |
-| **API Ease of Use**    | High                       | **High**          | High              |
-| **Local Support**      | No                         | **Yes (Nairobi)** | **Yes (Nairobi)** |
+| Feature             | BulkSMS.com      | ClickSend      | Sema (Local)                      |
+| :------------------ | :--------------- | :------------- | :-------------------------------- |
+| **Kenyan Delivery** | High (Shortcode) | High           | **Excellent**                     |
+| **Setup Friction**  | **Low**          | **Low**        | Medium                            |
+| **Pay-as-you-go**   | Yes (Credits)    | Yes            | Yes                               |
+| **Business Req**    | Personal ID OK   | Personal ID OK | Business docs preferred but ID OK |
 
----
-
-## Migration Path to Africa's Talking
-
-If you decide to switch, I have prepared a reference Supabase function for you. You would only need to:
-1. Create an account at Africa's Talking.
-2. Get your `API_KEY` and `USERNAME` (usually 'sandbox' or your app name).
-3. Update your Supabase secrets.
-
-**Author**: Peter Thairu Muigai  
-**Version**: 1.0  
-**Last Updated**: 2026-02-16
+**Author**: Peter Thairu Muigai
+**Version**: 1.1
+**Last Updated**: 2026-03-02
