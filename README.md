@@ -45,7 +45,34 @@ A comprehensive real-time hospital queuing system with patient self-service, SMS
 | SMS Alternatives                | Low-friction providers for Kenya/Africa | [docs/sms-alternatives.md](./docs/sms-alternatives.md)                                   | 2026-03-02   |
 | Supabase Keep-Alive             | Preventing free tier project pause      | [docs/supabase-keep-alive.md](./docs/supabase-keep-alive.md)                             | 2026-03-02   |
 
-## Setup Instructions
+## GitHub Pages Deployment
+
+The app is automatically built and deployed to GitHub Pages on every push to `main`.
+The live URL is: **https://pmuigai-sys.github.io/hosq/**
+
+### Required Repository Secrets
+
+Before the deployment workflow can succeed, you must add the following secrets to the GitHub repository:
+
+1. Go to **Settings → Secrets and variables → Actions** in the GitHub repository.
+2. Click **New repository secret** and add each of the following:
+
+| Secret name            | Where to find it                                                     |
+| ---------------------- | -------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`    | Supabase Dashboard → Project Settings → API → Project URL            |
+| `VITE_SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → `anon` public key   |
+
+> **Note:** Do **not** add `VITE_SUPABASE_SERVICE_ROLE_KEY` as a secret here — the service role key must never be exposed in a client-side application.
+
+### Enable GitHub Pages
+
+1. Go to **Settings → Pages** in the GitHub repository.
+2. Under **Source**, select **GitHub Actions**.
+3. Save. The next push to `main` (or a manual run of the *Deploy to GitHub Pages* workflow) will publish the site.
+
+---
+
+## Local Setup Instructions
 
 ### 1. Environment Variables
 
