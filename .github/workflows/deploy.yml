@@ -16,6 +16,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy-edge-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for func in send-sms keep-alive auto-emergency-triage sms-health; do
+            supabase functions deploy "$func" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --no-verify-jwt
+          done
+
+      - name: Set edge function secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase secrets set \
+            BULKSMS_TOKEN_ID="${{ secrets.BULKSMS_TOKEN_ID }}" \
+            BULKSMS_TOKEN_SECRET="${{ secrets.BULKSMS_TOKEN_SECRET }}" \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
   build:
     runs-on: ubuntu-latest
     steps:

@@ -57,12 +57,16 @@ Before the deployment workflow can succeed, you must add the following secrets t
 1. Go to **Settings → Secrets and variables → Actions** in the GitHub repository.
 2. Click **New repository secret** and add each of the following:
 
-| Secret name            | Where to find it                                                     |
-| ---------------------- | -------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`    | Supabase Dashboard → Project Settings → API → Project URL            |
-| `VITE_SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → `anon` public key   |
+| Secret name              | Where to find it                                                               |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| `VITE_SUPABASE_URL`      | Supabase Dashboard → Project Settings → API → Project URL                     |
+| `VITE_SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → `anon` public key               |
+| `SUPABASE_ACCESS_TOKEN`  | https://supabase.com/dashboard/account/tokens → Generate new token            |
+| `SUPABASE_PROJECT_REF`   | The ID portion of your Project URL (e.g. `xyzabc123` from `https://xyzabc123.supabase.co`) |
+| `BULKSMS_TOKEN_ID`       | BulkSMS dashboard → Settings → API Tokens                                     |
+| `BULKSMS_TOKEN_SECRET`   | BulkSMS dashboard → Settings → API Tokens                                     |
 
-> **Note:** Do **not** add `VITE_SUPABASE_SERVICE_ROLE_KEY` as a secret here — the service role key must never be exposed in a client-side application.
+> **Note:** Do **not** add `VITE_SUPABASE_SERVICE_ROLE_KEY` as a GitHub secret — the service role key must never be exposed in a client-side application. It is used exclusively in Supabase Edge Functions, where Supabase injects it automatically as `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### Enable GitHub Pages
 
