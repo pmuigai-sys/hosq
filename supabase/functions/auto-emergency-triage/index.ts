@@ -55,11 +55,11 @@ const rules: Rule[] = [
     id: "severe_bleeding",
     targetFlags: ["severe_bleeding", "obstetric_emergency"],
     strong: [
-      /\bsevere\s+bleed(ing)?|bleed(ing)?\s+alot|bleeding\s+too\s+much\b/,
+      /\b(severe|heavy|profuse)\s+bleed(ing)?|bleed(ing)?\s+a\s*lot|bleeding\s+too\s+much\b/,
       /\bnot\s+stop(ping)?\s+bleed(ing)?|uncontrol(l)?ed\s+bleed(ing)?\b/,
       /\bvomit(ing)?\s+blood|blood\s+in\s+stool|black\s+stool|anatoka\s+damu\s+nyingi\b/,
     ],
-    weak: [/\bblood\b/, /\bwound|cut\b/, /\bpost.?partum|pregnan(t|cy)\b/],
+    weak: [/\bblood\b|\bbleed(ing)?\b/, /\bwound|cut\b/, /\bpost.?partum|pregnan(t|cy)\b/],
     weakThreshold: 2,
   },
   {

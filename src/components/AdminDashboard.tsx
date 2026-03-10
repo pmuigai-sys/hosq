@@ -8,6 +8,9 @@ import {
   UserPlus,
   Shield,
   AlertTriangle,
+  RefreshCw,
+  Search,
+  CheckCircle,
 } from 'lucide-react';
 
 interface StaffMember {
@@ -51,6 +54,10 @@ export function AdminDashboard() {
   const [testSmsMessage, setTestSmsMessage] = useState('Test message from Hospital Queue System');
   const [testSmsStatus, setTestSmsStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [testSmsError, setTestSmsError] = useState<string>('');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffPageSize, setStaffPageSize] = useState(10);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [newUser, setNewUser] = useState({
     email: '',
@@ -66,6 +73,35 @@ export function AdminDashboard() {
     fetchFlags();
     checkSmsFunction();
   }, []);
+
+  const refreshAdminData = async () => {
+    await Promise.all([fetchEmployees(), fetchStages(), fetchFlags(), checkSmsFunction()]);
+    setNotice({ type: 'success', text: 'Dashboard data refreshed.' });
+  };
+
+  const filteredEmployees = employees.filter((emp) => {
+    if (!staffSearch.trim()) return true;
+    const needle = staffSearch.toLowerCase();
+    return (
+      emp.email.toLowerCase().includes(needle) ||
+      emp.role.toLowerCase().includes(needle) ||
+      (emp.department || '').toLowerCase().includes(needle)
+    );
+  });
+
+  useEffect(() => {
+    setStaffPage(1);
+  }, [staffSearch, staffPageSize]);
+
+  const totalStaffPages = Math.max(1, Math.ceil(filteredEmployees.length / staffPageSize));
+  const safeStaffPage = Math.min(staffPage, totalStaffPages);
+  const staffStart = (safeStaffPage - 1) * staffPageSize;
+  const pagedEmployees = filteredEmployees.slice(staffStart, staffStart + staffPageSize);
+
+  const activeStaffCount = employees.filter((emp) => emp.is_active).length;
+  const verifiedStaffCount = employees.filter((emp) => emp.email_verified).length;
+  const activeStageCount = stages.filter((stage) => stage.is_active).length;
+  const activeFlagCount = flags.filter((flag) => flag.is_active).length;
 
   const checkSmsFunction = async () => {
     try {
@@ -103,6 +139,7 @@ export function AdminDashboard() {
         message: 'SMS function healthy and secrets present.',
       });
     } catch (error) {
+      void error;
       setSmsStatus({
         state: 'error',
         message: 'SMS function not reachable. Check CORS/function deploy.',
@@ -146,6 +183,7 @@ export function AdminDashboard() {
 
       setTestSmsStatus('sent');
     } catch (error) {
+      void error;
       setTestSmsStatus('error');
       setTestSmsError('Network error sending test SMS');
     }
@@ -224,6 +262,7 @@ export function AdminDashboard() {
 ` +
         `The user can now log in immediately!`
       );
+      setNotice({ type: 'success', text: `Staff account created: ${newUser.email}` });
 
       setShowAddUser(false);
       setNewUser({
@@ -261,6 +300,7 @@ export function AdminDashboard() {
 ` +
           `Error: ${errorMessage}`
         );
+        setNotice({ type: 'error', text: 'Admin API not configured. Add service role key to environment.' });
       } else {
         alert(
           `Failed to create user: ${errorMessage}
@@ -268,6 +308,7 @@ export function AdminDashboard() {
 ` +
           `Please check the console for more details.`
         );
+        setNotice({ type: 'error', text: `Failed to create user: ${errorMessage}` });
       }
     } finally {
       setLoading(false);
@@ -276,6 +317,12 @@ export function AdminDashboard() {
 
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    const actionLabel = currentStatus ? 'deactivate' : 'activate';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} this staff account?`)) return;
+
+    const previous = employees;
+    setEmployees((prev) => prev.map((emp) => (emp.user_id === userId ? { ...emp, is_active: !currentStatus } : emp)));
+
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -284,18 +331,29 @@ export function AdminDashboard() {
 
       if (error) {
         console.error('Error toggling user status:', error);
+        setEmployees(previous);
         alert(`Failed to update user status: ${error.message}`);
+        setNotice({ type: 'error', text: `Failed to update user status: ${error.message}` });
         return;
       }
 
       fetchEmployees();
+      setNotice({ type: 'success', text: 'Staff status updated.' });
     } catch (err) {
       console.error('Unexpected error:', err);
+      setEmployees(previous);
       alert('An unexpected error occurred');
+      setNotice({ type: 'error', text: 'An unexpected error occurred while updating status.' });
     }
   };
 
   const handleToggleVerification = async (userId: string, currentStatus: boolean) => {
+    const actionLabel = currentStatus ? 'mark as unverified' : 'mark as verified';
+    if (!window.confirm(`Are you sure you want to ${actionLabel}?`)) return;
+
+    const previous = employees;
+    setEmployees((prev) => prev.map((emp) => (emp.user_id === userId ? { ...emp, email_verified: !currentStatus } : emp)));
+
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -304,35 +362,78 @@ export function AdminDashboard() {
 
       if (error) {
         console.error('Error toggling verification:', error);
+        setEmployees(previous);
         alert(`Failed to update verification status: ${error.message}`);
+        setNotice({ type: 'error', text: `Failed to update verification status: ${error.message}` });
         return;
       }
 
       fetchEmployees();
+      setNotice({ type: 'success', text: 'Email verification status updated.' });
     } catch (err) {
       console.error('Unexpected error:', err);
+      setEmployees(previous);
       alert('An unexpected error occurred');
+      setNotice({ type: 'error', text: 'An unexpected error occurred while updating verification.' });
     }
   };
 
   const handleToggleStage = async (stageId: string, currentStatus: boolean) => {
-    await supabase
-      .from('queue_stages')
-      .update({ is_active: !currentStatus })
-      .eq('id', stageId);
-    fetchStages();
+    const actionLabel = currentStatus ? 'deactivate' : 'activate';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} this stage?`)) return;
+
+    const previous = stages;
+    setStages((prev) => prev.map((stage) => (stage.id === stageId ? { ...stage, is_active: !currentStatus } : stage)));
+
+    try {
+      const { error } = await supabase
+        .from('queue_stages')
+        .update({ is_active: !currentStatus })
+        .eq('id', stageId);
+
+      if (error) {
+        setStages(previous);
+        setNotice({ type: 'error', text: `Failed to update stage: ${error.message}` });
+        return;
+      }
+
+      fetchStages();
+      setNotice({ type: 'success', text: 'Queue stage updated.' });
+    } catch {
+      setStages(previous);
+      setNotice({ type: 'error', text: 'Unexpected error updating stage.' });
+    }
   };
 
   const handleToggleFlag = async (flagId: string, currentStatus: boolean) => {
-    await supabase
-      .from('emergency_flags')
-      .update({ is_active: !currentStatus })
-      .eq('id', flagId);
-    fetchFlags();
+    const actionLabel = currentStatus ? 'deactivate' : 'activate';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} this emergency flag?`)) return;
+
+    const previous = flags;
+    setFlags((prev) => prev.map((flag) => (flag.id === flagId ? { ...flag, is_active: !currentStatus } : flag)));
+
+    try {
+      const { error } = await supabase
+        .from('emergency_flags')
+        .update({ is_active: !currentStatus })
+        .eq('id', flagId);
+
+      if (error) {
+        setFlags(previous);
+        setNotice({ type: 'error', text: `Failed to update emergency flag: ${error.message}` });
+        return;
+      }
+
+      fetchFlags();
+      setNotice({ type: 'success', text: 'Emergency flag updated.' });
+    } catch {
+      setFlags(previous);
+      setNotice({ type: 'error', text: 'Unexpected error updating emergency flag.' });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -341,6 +442,48 @@ export function AdminDashboard() {
           <p className="text-gray-600">
             Manage users, queue stages, and emergency flags
           </p>
+        </div>
+        {notice && (
+          <div
+            className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
+              notice.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-rose-200 bg-rose-50 text-rose-800'
+            }`}
+          >
+            {notice.text}
+          </div>
+        )}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{employees.length}</p>
+            <p className="text-sm text-slate-600">{activeStaffCount} active</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Verified Staff</p>
+            <p className="mt-2 text-2xl font-bold text-blue-700">{verifiedStaffCount}</p>
+            <p className="text-sm text-slate-600">Email confirmed</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Queue Stages</p>
+            <p className="mt-2 text-2xl font-bold text-emerald-700">{activeStageCount}</p>
+            <p className="text-sm text-slate-600">{stages.length} configured</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Emergency Flags</p>
+            <p className="mt-2 text-2xl font-bold text-rose-700">{activeFlagCount}</p>
+            <p className="text-sm text-slate-600">{flags.length} configured</p>
+          </div>
+        </div>
+        <div className="mb-6 flex items-center justify-end">
+          <button
+            onClick={refreshAdminData}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Data
+          </button>
         </div>
         <div
           className={`mb-6 rounded-lg border p-4 text-sm ${
@@ -390,7 +533,7 @@ export function AdminDashboard() {
               {testSmsStatus === 'sending' ? 'Sending...' : 'Send Test SMS'}
             </button>
             {testSmsStatus === 'sent' && (
-              <span className="text-green-700">Test SMS sent.</span>
+              <span className="inline-flex items-center gap-1 text-green-700"><CheckCircle className="h-4 w-4" />Test SMS sent.</span>
             )}
             {testSmsStatus === 'error' && (
               <span className="text-red-700">{testSmsError}</span>
@@ -448,6 +591,20 @@ export function AdminDashboard() {
                     <UserPlus className="w-4 h-4" />
                     Add Staff Member
                   </button>
+                </div>
+
+                <div className="mb-4 max-w-md">
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">Search staff</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={staffSearch}
+                      onChange={(e) => setStaffSearch(e.target.value)}
+                      placeholder="Email, role, department"
+                      className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
 
                 {showAddUser && (
@@ -554,7 +711,7 @@ export function AdminDashboard() {
 
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                           Email
@@ -574,7 +731,7 @@ export function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {employees.map((emp: StaffMember) => (
+                      {pagedEmployees.map((emp: StaffMember) => (
                         <tr key={emp.id}>
                           <td className="px-6 py-4 text-sm text-gray-900">
                             {emp.email}
@@ -635,6 +792,40 @@ export function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+                {filteredEmployees.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+                    <span>
+                      Showing {staffStart + 1}-{Math.min(staffStart + staffPageSize, filteredEmployees.length)} of {filteredEmployees.length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>Rows</span>
+                      <select
+                        value={staffPageSize}
+                        onChange={(e) => setStaffPageSize(Number(e.target.value))}
+                        className="rounded-md border border-gray-300 px-2 py-1"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={30}>30</option>
+                      </select>
+                      <button
+                        onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
+                        disabled={safeStaffPage === 1}
+                        className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <span>Page {safeStaffPage} / {totalStaffPages}</span>
+                      <button
+                        onClick={() => setStaffPage((p) => Math.min(totalStaffPages, p + 1))}
+                        disabled={safeStaffPage === totalStaffPages}
+                        className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
