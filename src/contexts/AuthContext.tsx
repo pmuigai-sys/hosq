@@ -1,21 +1,21 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/instant';
 
 interface UserRole {
   id: string;
-  user_id: string;
+  email: string;
   role: string;
-  department: string | null;
+  department: string | null | undefined;
   is_active: boolean;
   email_verified: boolean;
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: any;
   userRole: UserRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string) => Promise<void>;
+  verifyCode: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isStaff: boolean;
@@ -24,69 +24,62 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const { isLoading, user } = db.useAuth();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingRole, setLoadingRole] = useState(true);
+
+  // Query user role when user changes
+  const { data: roleData, isLoading: isLoadingRole } = db.useQuery(
+    user?.email ? {
+      user_roles: {
+        $: {
+          where: {
+            email: user.email,
+            is_active: true
+          }
+        }
+      }
+    } : null
+  );
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserRole(session.user.id);
+    if (!isLoadingRole && roleData?.user_roles) {
+      const rawRole = (roleData as any).user_roles[0];
+      if (rawRole) {
+        setUserRole({
+          id: rawRole.id,
+          email: rawRole.email,
+          role: rawRole.role,
+          department: rawRole.department ?? null,
+          is_active: rawRole.is_active,
+          email_verified: rawRole.email_verified
+        });
       } else {
-        setLoading(false);
+        setUserRole(null);
       }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchUserRole(session.user.id);
-        } else {
-          setUserRole(null);
-          setLoading(false);
-        }
-      })();
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error) throw error;
-      setUserRole(data);
-    } catch (error) {
-      console.error('Error fetching user role:', error);
+      setLoadingRole(false);
+    } else if (!user) {
       setUserRole(null);
-    } finally {
-      setLoading(false);
+      setLoadingRole(false);
     }
+  }, [roleData, isLoadingRole, user]);
+
+  const signIn = async (email: string) => {
+    await db.auth.sendMagicCode({ email });
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
+  const verifyCode = async (email: string, code: string) => {
+    await db.auth.signInWithMagicCode({ email, code });
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await db.auth.signOut();
   };
 
   const isAdmin = userRole?.role === 'admin';
   const isStaff = userRole !== null && (userRole.role === 'admin' || userRole.email_verified === true);
+
+  const loading = isLoading || loadingRole;
 
   return (
     <AuthContext.Provider
@@ -95,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userRole,
         loading,
         signIn,
+        verifyCode,
         signOut,
         isAdmin,
         isStaff,

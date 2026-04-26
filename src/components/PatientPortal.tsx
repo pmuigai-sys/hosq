@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/instant';
 import { useQueueStages } from '../hooks/useQueue';
 import { sendSMS } from '../lib/sms';
 import { runAutoEmergencyTriage } from '../lib/auto-triage';
 import { normalizeKenyanPhone } from '../lib/phone';
+import { generateQueueNumber, syncQueuePositions } from '../lib/queue-logic';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 export function PatientPortal() {
   const [step, setStep] = useState<'form' | 'tracking'>('form');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [queueEntryId, setQueueEntryId] = useState('');
   const [queueNumber, setQueueNumber] = useState('');
   const [emergencyFlagged, setEmergencyFlagged] = useState(false);
 
@@ -34,62 +34,64 @@ export function PatientPortal() {
         throw new Error('Only Kenyan mobile numbers are allowed (e.g., +254712345678 or 0712345678).');
       }
 
-      let patientId = '';
-      const { data: existingPatient } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('phone_number', normalizedPhone)
-        .maybeSingle();
+      // Check for existing patient
+      const { data: patientData } = await db.queryOnce({
+        patients: {
+          $: {
+            where: { phone_number: normalizedPhone }
+          }
+        }
+      });
 
-      if (existingPatient) {
-        patientId = existingPatient.id;
-        await supabase
-          .from('patients')
-          .update({
-            full_name: formData.fullName,
-            age: formData.age ? parseInt(formData.age) : null,
-            visit_reason: formData.visitReason,
-          })
-          .eq('id', patientId);
-      } else {
-        const { data: newPatient, error: patientError } = await supabase
-          .from('patients')
-          .insert({
-            phone_number: normalizedPhone,
-            full_name: formData.fullName,
-            age: formData.age ? parseInt(formData.age) : null,
-            visit_reason: formData.visitReason,
-          })
-          .select()
-          .single();
-
-        if (patientError) throw patientError;
-        patientId = newPatient.id;
+      let patientId = patientData?.patients?.[0]?.id;
+      if (!patientId) {
+        patientId = crypto.randomUUID();
       }
 
       const firstStage = stages[0];
       if (!firstStage) throw new Error('No stages available');
 
-      const { data: queueEntry, error: queueError } = await supabase
-        .from('queue_entries')
-        .insert({
-          patient_id: patientId,
-          current_stage_id: firstStage.id,
-          status: 'waiting',
+      const queueEntryId = crypto.randomUUID();
+      const historyId = crypto.randomUUID();
+      const qNumber = generateQueueNumber();
+
+      // Create patient
+      await db.transact(
+        db.tx.patients[patientId].update({
+          phone_number: normalizedPhone,
+          full_name: formData.fullName,
+          age: formData.age ? parseInt(formData.age) : undefined,
+          visit_reason: formData.visitReason,
+          updated_at: new Date().toISOString(),
+          created_at: patientData?.patients?.[0]?.created_at || new Date().toISOString(),
         })
-        .select()
-        .single();
+      );
 
-      if (queueError) throw queueError;
+      // Create queue entry
+      await db.transact(
+        db.tx.queue_entries[queueEntryId].update({
+          queue_number: qNumber,
+          status: 'waiting',
+          has_emergency_flag: false,
+          checked_in_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          notes: '',
+        })
+        .link({ patient: patientId, current_stage: firstStage.id })
+      );
 
-      await supabase.from('queue_history').insert({
-        queue_entry_id: queueEntry.id,
-        stage_id: firstStage.id,
-      });
+      // Create queue history
+      await db.transact(
+        db.tx.queue_history[historyId].update({
+          entered_at: new Date().toISOString(),
+        })
+        .link({ queue_entry: queueEntryId, stage: firstStage.id })
+      );
 
       const parsedAge = formData.age ? parseInt(formData.age) : undefined;
       const triageResult = await runAutoEmergencyTriage(
-        queueEntry.id,
+        queueEntryId,
         patientId,
         formData.visitReason,
         parsedAge
@@ -100,19 +102,21 @@ export function PatientPortal() {
         setEmergencyFlagged(true);
       }
 
+      // Sync positions after triage (which might have added emergency flags)
+      await syncQueuePositions(firstStage.id);
+
       const smsResult = await sendSMS(
         normalizedPhone,
-        `Hello ${formData.fullName}, you have been registered with queue number ${queueEntry.queue_number}. You are at ${firstStage.display_name}. Track your status at this page.`,
+        `Hello ${formData.fullName}, you have been registered with queue number ${qNumber}. You are at ${firstStage.display_name}. Track your status at this page.`,
         patientId,
-        queueEntry.id
+        queueEntryId
       );
       if (!smsResult.success) {
         console.warn('SMS send failed:', smsResult.error);
         setError(smsResult.error || 'SMS failed to send. Please verify SMS configuration.');
       }
 
-      setQueueEntryId(queueEntry.id);
-      setQueueNumber(queueEntry.queue_number);
+      setQueueNumber(qNumber);
       setStep('tracking');
     } catch (err: any) {
       setError(err.message || 'Failed to register. Please try again.');

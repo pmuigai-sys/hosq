@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQueueEntries, useQueueStages, useEmergencyFlags } from '../hooks/useQueue';
-import { supabase } from '../lib/supabase';
-import { notifyPatientStageChange, notifyPatientCalled, notifyPositionChange } from '../lib/sms';
+import { db } from '../lib/instant';
+import { notifyPatientStageChange, notifyPatientCalled } from '../lib/sms';
+import { syncQueuePositions } from '../lib/queue-logic';
 import {
   Users,
   Clock,
@@ -19,32 +20,35 @@ export function EmployeeDashboard() {
   const { flags } = useEmergencyFlags();
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [showCompleted, setShowCompleted] = useState(false);
-  const { entries, refresh } = useQueueEntries(selectedStage || undefined, 'all');
+  const { entries } = useQueueEntries(selectedStage || undefined, 'all');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const activeEntries = entries.filter((entry) => entry.status !== 'completed' && entry.status !== 'cancelled');
+  
+  const activeEntries = entries.filter((entry: any) => entry.status !== 'completed' && entry.status !== 'cancelled');
   const visibleEntries = showCompleted ? entries : activeEntries;
 
   const handleCallNext = async (entryId: string) => {
     setProcessingId(entryId);
     try {
-      const entry = entries.find((e) => e.id === entryId);
+      const entry: any = entries.find((e: any) => e.id === entryId);
       if (!entry) return;
 
-      await supabase
-        .from('queue_entries')
-        .update({ status: 'in_service' })
-        .eq('id', entryId);
-
-      const stageId = entry.current_stage_id || selectedStage;
+      const stageId = entry.current_stage?.id || selectedStage;
       if (!stageId) {
         throw new Error('Missing stage id for queue history');
       }
 
-      await supabase.from('queue_history').insert({
-        queue_entry_id: entryId,
-        stage_id: stageId,
-        served_by_user_id: userRole?.user_id,
-      });
+      const historyId = crypto.randomUUID();
+
+      await db.transact([
+        db.tx.queue_entries[entryId].update({ 
+          status: 'in_service',
+          updated_at: new Date().toISOString()
+        }),
+        db.tx.queue_history[historyId].update({
+          entered_at: new Date().toISOString(),
+        })
+        .link({ queue_entry: entryId, stage: stageId, served_by: userRole?.id })
+      ]);
 
       await notifyPatientCalled(
         entryId,
@@ -52,7 +56,6 @@ export function EmployeeDashboard() {
         entry.queue_number
       );
 
-      refresh();
     } catch (error) {
       console.error('Error calling patient:', error);
     } finally {
@@ -63,46 +66,75 @@ export function EmployeeDashboard() {
   const handleComplete = async (entryId: string, moveToNext: boolean) => {
     setProcessingId(entryId);
     try {
-      const entry = entries.find((e) => e.id === entryId);
+      const entry: any = entries.find((e: any) => e.id === entryId);
       if (!entry) return;
 
       const currentStageIndex = stages.findIndex(
-        (s) => s.id === entry.current_stage_id
+        (s: any) => s.id === entry.current_stage?.id
       );
       const nextStage = moveToNext ? stages[currentStageIndex + 1] : null;
 
-      await supabase.from('queue_history').update({ exited_at: new Date().toISOString() }).eq('queue_entry_id', entryId).is('exited_at', null);
+      // Find open history record and close it
+      const { data: historyDataRaw } = await db.queryOnce({
+        queue_history: {
+          $: {
+            where: {
+              queue_entry: entryId,
+              exited_at: null
+            } as any
+          }
+        }
+      });
+      const historyData = historyDataRaw as any;
+
+      if (historyData?.queue_history?.[0]) {
+        await db.transact(
+          db.tx.queue_history[historyData.queue_history[0].id].update({
+            exited_at: new Date().toISOString()
+          })
+        );
+      }
 
       if (nextStage) {
-        await supabase
-          .from('queue_entries')
-          .update({
-            current_stage_id: nextStage.id,
+        await db.transact(
+          db.tx.queue_entries[entryId].update({
             status: 'waiting',
+            updated_at: new Date().toISOString()
           })
-          .eq('id', entryId);
+          .link({ current_stage: nextStage.id })
+        );
 
-        await supabase.from('queue_history').insert({
-          queue_entry_id: entryId,
-          stage_id: nextStage.id,
-        });
+        const newHistoryId = crypto.randomUUID();
+        await db.transact(
+          db.tx.queue_history[newHistoryId].update({
+            entered_at: new Date().toISOString(),
+          })
+          .link({ queue_entry: entryId, stage: nextStage.id })
+        );
+      } else {
+        await db.transact(
+          db.tx.queue_entries[entryId].update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        );
+      }
 
+      // Sync positions for the stage we just left
+      if (entry.current_stage?.id) {
+        await syncQueuePositions(entry.current_stage.id);
+      }
+      // Sync positions for the new stage
+      if (nextStage) {
+        await syncQueuePositions(nextStage.id);
         await notifyPatientStageChange(
           entryId,
           nextStage.display_name,
           entry.queue_number
         );
-      } else {
-        await supabase
-          .from('queue_entries')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', entryId);
       }
 
-      refresh();
     } catch (error) {
       console.error('Error completing service:', error);
     } finally {
@@ -112,18 +144,24 @@ export function EmployeeDashboard() {
 
   const handleAddEmergencyFlag = async (entryId: string, flagId: string) => {
     try {
-      await supabase.from('patient_emergency_flags').insert({
-        queue_entry_id: entryId,
-        emergency_flag_id: flagId,
-        noted_by_user_id: userRole?.user_id,
-      });
+      const flagEntryId = crypto.randomUUID();
+      await db.transact(
+        db.tx.patient_emergency_flags[flagEntryId].update({
+          created_at: new Date().toISOString()
+        })
+        .link({ queue_entry: entryId, flag_definition: flagId, noted_by: userRole?.id })
+      );
+      await db.transact(
+        db.tx.queue_entries[entryId].update({ 
+          has_emergency_flag: true,
+          updated_at: new Date().toISOString()
+        })
+      );
 
-      await supabase
-        .from('queue_entries')
-        .update({ has_emergency_flag: true })
-        .eq('id', entryId);
-
-      refresh();
+      const entry: any = entries.find((e: any) => e.id === entryId);
+      if (entry?.current_stage?.id) {
+        await syncQueuePositions(entry.current_stage.id);
+      }
     } catch (error) {
       console.error('Error adding emergency flag:', error);
     }
@@ -137,7 +175,7 @@ export function EmployeeDashboard() {
             Queue Management
           </h1>
           <p className="text-gray-600">
-            {userRole?.role.charAt(0).toUpperCase() + userRole?.role.slice(1)} Dashboard
+            {userRole?.role ? userRole.role.charAt(0).toUpperCase() + userRole.role.slice(1) : 'Staff'} Dashboard
             {userRole?.department && ` - ${userRole.department}`}
           </p>
         </div>
@@ -148,7 +186,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Waiting</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {activeEntries.filter((e) => e.status === 'waiting').length}
+                  {activeEntries.filter((e: any) => e.status === 'waiting').length}
                 </p>
               </div>
               <Clock className="w-8 h-8 text-blue-600" />
@@ -160,7 +198,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">In Service</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {activeEntries.filter((e) => e.status === 'in_service').length}
+                  {activeEntries.filter((e: any) => e.status === 'in_service').length}
                 </p>
               </div>
               <Users className="w-8 h-8 text-green-600" />
@@ -172,7 +210,7 @@ export function EmployeeDashboard() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Priority Cases</p>
                 <p className="text-3xl font-bold text-red-600">
-                  {activeEntries.filter((e) => e.has_emergency_flag).length}
+                  {activeEntries.filter((e: any) => e.has_emergency_flag).length}
                 </p>
               </div>
               <AlertTriangle className="w-8 h-8 text-red-600" />
@@ -203,7 +241,7 @@ export function EmployeeDashboard() {
               className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Stages</option>
-              {stages.map((stage) => (
+              {stages.map((stage: any) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.display_name}
                 </option>
@@ -257,7 +295,7 @@ export function EmployeeDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  visibleEntries.map((entry) => (
+                  visibleEntries.map((entry: any) => (
                     <tr
                       key={entry.id}
                       className={entry.has_emergency_flag ? 'bg-red-50' : ''}
@@ -336,7 +374,7 @@ export function EmployeeDashboard() {
                                   <option value="" disabled>
                                     Add Flag
                                   </option>
-                                  {flags.map((flag) => (
+                                  {flags.map((flag: any) => (
                                     <option key={flag.id} value={flag.id}>
                                       {flag.name}
                                     </option>

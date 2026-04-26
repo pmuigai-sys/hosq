@@ -1,75 +1,38 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Clock, CheckCircle, ArrowRight, AlertCircle } from 'lucide-react';
+import { db } from '../lib/instant';
+import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface QueueTrackerProps {
   queueNumber: string;
 }
 
 export function QueueTracker({ queueNumber }: QueueTrackerProps) {
-  const [queueEntry, setQueueEntry] = useState<any>(null);
-  const [stages, setStages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchData();
-
-    const channel = supabase
-      .channel(`queue_${queueNumber}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'queue_entries',
-          filter: `queue_number=eq.${queueNumber}`,
-        },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queueNumber]);
-
-  const fetchData = async () => {
-    try {
-      const [entryResult, stagesResult] = await Promise.all([
-        supabase
-          .from('queue_entries')
-          .select(`
-            *,
-            patients(full_name, phone_number),
-            queue_stages(display_name, name, order_number)
-          `)
-          .eq('queue_number', queueNumber)
-          .maybeSingle(),
-        supabase
-          .from('queue_stages')
-          .select('*')
-          .eq('is_active', true)
-          .order('order_number', { ascending: true }),
-      ]);
-
-      if (entryResult.data) setQueueEntry(entryResult.data);
-      if (stagesResult.data) setStages(stagesResult.data);
-    } catch (error) {
-      console.error('Error fetching queue data:', error);
-    } finally {
-      setLoading(false);
+  const { isLoading, data: rawData } = db.useQuery({
+    queue_entries: {
+      $: {
+        where: { queue_number: queueNumber } as any
+      },
+      patient: {},
+      current_stage: {}
+    },
+    queue_stages: {
+      $: {
+        where: { is_active: true },
+        order: { serverCreatedAt: 'asc' }
+      }
     }
-  };
+  });
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
+
+  const data = rawData as any;
+  const queueEntry: any = data?.queue_entries?.[0];
+  const stages = data?.queue_stages || [];
 
   if (!queueEntry) {
     return (
@@ -80,7 +43,7 @@ export function QueueTracker({ queueNumber }: QueueTrackerProps) {
     );
   }
 
-  const currentStageOrder = queueEntry.queue_stages?.order_number || 0;
+  const currentStageOrder = queueEntry.current_stage?.order_number || 0;
   const isCompleted = queueEntry.status === 'completed';
 
   return (
@@ -89,7 +52,7 @@ export function QueueTracker({ queueNumber }: QueueTrackerProps) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {queueEntry.patients?.full_name}
+              {queueEntry.patient?.full_name}
             </h2>
             <p className="text-gray-600">Queue #{queueEntry.queue_number}</p>
           </div>
@@ -127,10 +90,9 @@ export function QueueTracker({ queueNumber }: QueueTrackerProps) {
 
       <div className="space-y-4">
         <h3 className="font-semibold text-gray-900 mb-4">Your Journey</h3>
-        {stages.map((stage, index) => {
+        {stages.map((stage: any, index: number) => {
           const isPast = stage.order_number < currentStageOrder;
           const isCurrent = stage.order_number === currentStageOrder;
-          const isFuture = stage.order_number > currentStageOrder;
 
           return (
             <div key={stage.id} className="flex items-start gap-4">

@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { db } from './instant';
 
 export async function sendSMS(
   to: string,
@@ -7,36 +7,51 @@ export async function sendSMS(
   queueEntryId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-sms`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to,
-          message,
-          patientId,
-          queueEntryId,
-        }),
-      }
-    );
+    const tokenId = import.meta.env.VITE_BULKSMS_TOKEN_ID;
+    const tokenSecret = import.meta.env.VITE_BULKSMS_TOKEN_SECRET;
+
+    if (!tokenId || !tokenSecret) {
+      console.warn('BulkSMS credentials missing, skipping SMS');
+      return { success: true }; // Skip if not configured
+    }
+
+    const formattedPhone = to.startsWith("+") ? to : `+${to}`;
+    const url = "https://api.bulksms.com/v1/messages";
+    const authHeader = `Basic ${btoa(`${tokenId}:${tokenSecret}`)}`;
+
+    const payload = [{ to: formattedPhone, body: message }];
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
+      },
+      body: JSON.stringify(payload),
+    });
 
     const data = await response.json();
+    const result = data[0];
+    const logStatus = response.status >= 200 && response.status < 300 ? "sent" : "failed";
+
+    // Log to InstantDB
+    const logId = crypto.randomUUID();
+    const tx = db.tx.sms_logs[logId].update({
+      phone_number: formattedPhone,
+      message,
+      status: logStatus,
+      external_id: result?.id || null,
+      sent_at: new Date().toISOString(),
+    });
+
+    if (patientId) tx.link({ patient: patientId });
+    if (queueEntryId) tx.link({ queue_entry: queueEntryId });
+
+    await db.transact(tx);
 
     if (!response.ok) {
-      const detail =
-        data?.details?.message ||
-        data?.details?.error_message ||
-        data?.details?.more_info ||
-        (data?.details ? JSON.stringify(data.details) : '');
-      const errorMessage = [data?.error || 'Failed to send SMS', detail]
-        .filter(Boolean)
-        .join(' - ');
-      return { success: false, error: errorMessage };
+      return { success: false, error: 'Failed to send SMS via BulkSMS' };
     }
 
     return { success: true };
@@ -51,21 +66,25 @@ export async function notifyPatientCalled(
   stageName: string,
   queueNumber: string
 ) {
-  const { data: queueEntry } = await supabase
-    .from('queue_entries')
-    .select('patient_id, patients(phone_number, full_name), position_in_queue')
-    .eq('id', queueEntryId)
-    .maybeSingle();
+  const { data } = await db.queryOnce({
+    queue_entries: {
+      $: {
+        where: { id: queueEntryId }
+      },
+      patient: {}
+    }
+  });
 
-  if (!queueEntry) return;
+  const queueEntry = data?.queue_entries?.[0];
+  if (!queueEntry || !queueEntry.patient) return;
 
-  const patient = queueEntry.patients as any;
+  const patient = queueEntry.patient;
   const message = `Hello ${patient.full_name}, your queue number ${queueNumber} is now being called! Please proceed to the ${stageName} counter immediately.`;
 
   await sendSMS(
     patient.phone_number,
     message,
-    queueEntry.patient_id,
+    patient.id,
     queueEntryId
   );
 }
@@ -75,21 +94,25 @@ export async function notifyPatientStageChange(
   stageName: string,
   queueNumber: string
 ) {
-  const { data: queueEntry } = await supabase
-    .from('queue_entries')
-    .select('patient_id, patients(phone_number, full_name)')
-    .eq('id', queueEntryId)
-    .maybeSingle();
+  const { data } = await db.queryOnce({
+    queue_entries: {
+      $: {
+        where: { id: queueEntryId }
+      },
+      patient: {}
+    }
+  });
 
-  if (!queueEntry) return;
+  const queueEntry = data?.queue_entries?.[0];
+  if (!queueEntry || !queueEntry.patient) return;
 
-  const patient = queueEntry.patients as any;
+  const patient = queueEntry.patient;
   const message = `Hello ${patient.full_name}, your queue number ${queueNumber} has moved to ${stageName}. Please proceed to the counter when called.`;
 
   await sendSMS(
     patient.phone_number,
     message,
-    queueEntry.patient_id,
+    patient.id,
     queueEntryId
   );
 }
@@ -100,15 +123,19 @@ export async function notifyPositionChange(
   queueNumber: string,
   stageName: string
 ) {
-  const { data: queueEntry } = await supabase
-    .from('queue_entries')
-    .select('patient_id, patients(phone_number, full_name)')
-    .eq('id', queueEntryId)
-    .maybeSingle();
+  const { data } = await db.queryOnce({
+    queue_entries: {
+      $: {
+        where: { id: queueEntryId }
+      },
+      patient: {}
+    }
+  });
 
-  if (!queueEntry) return;
+  const queueEntry = data?.queue_entries?.[0];
+  if (!queueEntry || !queueEntry.patient) return;
 
-  const patient = queueEntry.patients as any;
+  const patient = queueEntry.patient;
 
   let positionText = '';
   if (newPosition === 1) {
@@ -124,7 +151,7 @@ export async function notifyPositionChange(
   await sendSMS(
     patient.phone_number,
     message,
-    queueEntry.patient_id,
+    patient.id,
     queueEntryId
   );
 }
