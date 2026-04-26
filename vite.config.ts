@@ -7,6 +7,7 @@ const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
 
 export default defineConfig({
   base: isGitHubActions ? `/${repoName}/` : '/',
+  plugins: [react()],
   resolve: {
     alias: {
       'lucide-react/dist/esm/icons/fingerprint': 'lucide-react/dist/esm/icons/activity',
