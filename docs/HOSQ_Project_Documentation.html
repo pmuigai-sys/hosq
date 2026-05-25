@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HOSQ Project Documentation</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .title-page {
+            text-align: center;
+            padding: 100px 0;
+            border-bottom: 2px solid #2980b9;
+        }
+        .title-page h1 {
+            font-size: 3em;
+            color: #2980b9;
+            margin-bottom: 20px;
+        }
+        .title-page p {
+            font-size: 1.2em;
+            color: #7f8c8d;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+            page-break-after: always;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #bdc3c7;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #bdc3c7;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-left: 5px solid #2980b9;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="title-page">
+        <h1>HOSQ</h1>
+        <p>Hospital Queue Management System</p>
+        <p><strong>Official Technical Manual and Handover Document</strong></p>
+        <br><br>
+        <p>Author: Peter Thairu Muigai</p>
+        <p>Date: February 18, 2026</p>
+        <p>Version 1.0.0</p>
+    </div>
+
+    <div class="section">
+        <h2>1. System Overview</h2>
+        <p>The Hospital Queue Management System (HOSQ) is a comprehensive real-time solution designed to streamline the patient experience and hospital staff workflows. Built on a serverless architecture using Supabase and Africa's Talking, it ensures maximum scalability and reliability in the African market.</p>
+        
+        <h3>Key Features:</h3>
+        <ul>
+            <li><strong>Patient Portal:</strong> Self-service registration and live queue tracking.</li>
+            <li><strong>Staff Dashboard:</strong> Role-based access for Doctors, Billing, and Pharmacists.</li>
+            <li><strong>Admin Panel:</strong> Full control over staff, stages, and emergency priority.</li>
+            <li><strong>Smart SMS:</strong> Automated notifications via Africa's Talking.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>2. Technical Architecture</h2>
+        <p>HOSQ uses a modern decentralized stack to ensure high performance even on mobile networks.</p>
+        <table>
+            <tr>
+                <th>Component</th>
+                <th>Technology</th>
+            </tr>
+            <tr>
+                <td>Frontend</td>
+                <td>React 18 + TypeScript + Vite</td>
+            </tr>
+            <tr>
+                <td>Real-time Communication</td>
+                <td>Supabase Realtime (Cdc)</td>
+            </tr>
+            <tr>
+                <td>Backend Logic</td>
+                <td>Supabase Edge Functions (Deno)</td>
+            </tr>
+            <tr>
+                <td>Database</td>
+                <td>PostgreSQL (hosted on Supabase)</td>
+            </tr>
+            <tr>
+                <td>SMS Integration</td>
+                <td>Africa's Talking REST API</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>3. Setup and Installation</h2>
+        <p>To deploy HOSQ in a new environment, follow these steps:</p>
+        <ol>
+            <li><strong>Environment Configuration:</strong> Create a .env.local file with your Supabase URL and Anon Key.</li>
+            <li><strong>Database Initialization:</strong> Run the provided SQL migrations to set up tables and triggers.</li>
+            <li><strong>SMS Setup:</strong> Set your Africa's Talking API Key and Username as Supabase Secrets.</li>
+            <li><strong>Deployment:</strong> Deploy the Edge Functions using <code>supabase functions deploy send-sms</code>.</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>4. User Guide for Hospital Staff</h2>
+        <p>Staff members can manage the queue flow using the following actions:</p>
+        <ul>
+            <li><strong>Call:</strong> Notifies the next patient to proceed to the counter.</li>
+            <li><strong>Next:</strong> Completes the current stage and moves the patient to the next department.</li>
+            <li><strong>Emergency Flag:</strong> Prioritizes a patient, moving them to position #1.</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2026 Peter Thairu Muigai. All rights reserved.</p>
+    </div>
+
+</body>
+</html>
