@@ -27,9 +27,9 @@ export function TriageDashboard() {
     (s) =>
       s.name?.toLowerCase().includes('triage') ||
       s.display_name?.toLowerCase().includes('triage')
-  ) || stages[1]; // fallback: second stage
+  );
 
-  const { entries, refresh } = useQueueEntries(triageStage?.id, 'all');
+  const { entries, refresh } = useQueueEntries(triageStage?.id ?? 'none', 'all');
 
   const activeEntries = entries.filter(
     (e) => e.status !== 'completed' && e.status !== 'cancelled'
@@ -162,6 +162,20 @@ export function TriageDashboard() {
   const waiting = activeEntries.filter((e) => e.status === 'waiting');
   const inService = activeEntries.filter((e) => e.status === 'in_service');
   const priority = activeEntries.filter((e) => e.has_emergency_flag);
+
+  if (!triageStage && stages.length > 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl shadow p-8 max-w-md text-center">
+          <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Triage Stage Not Found</h2>
+          <p className="text-gray-500 text-sm">
+            No triage stage exists in the database. Run the latest migration in Supabase to add it, then refresh.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
