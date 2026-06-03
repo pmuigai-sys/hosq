@@ -3,22 +3,29 @@ import { supabase } from '../lib/supabase';
 import { AlertTriangle, Activity, Users, Clock, Stethoscope, Scissors } from 'lucide-react';
 import type { QueueEntry } from '../hooks/useQueue';
 
-type Destination = 'Go to Doctor' | 'Go to Theatre';
+type DisplayMessage = 'Wait for Doctor' | 'Go to Doctor' | 'Go to Theatre';
 
-const BADGE_STYLES: Record<Destination, { color: string; Icon: typeof Stethoscope }> = {
-  'Go to Doctor':  { color: 'bg-blue-600 text-white',  Icon: Stethoscope },
-  'Go to Theatre': { color: 'bg-amber-500 text-white', Icon: Scissors    },
+const BADGE_STYLES: Record<DisplayMessage, { color: string; Icon: typeof Stethoscope }> = {
+  'Wait for Doctor': { color: 'bg-yellow-500 text-white', Icon: Clock        },
+  'Go to Doctor':    { color: 'bg-green-600 text-white',  Icon: Stethoscope  },
+  'Go to Theatre':   { color: 'bg-purple-600 text-white', Icon: Scissors     },
 };
 
-function DestinationBadge({ destination, size }: { destination: string; size: 'sm' | 'md' | 'lg' }) {
-  const key: Destination = destination === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor';
-  const { color, Icon } = BADGE_STYLES[key];
+function resolveMessage(entry: any): DisplayMessage {
+  if (entry.destination_message === 'Go to Theatre') return 'Go to Theatre';
+  if (entry.status === 'in_service') return 'Go to Doctor';
+  return 'Wait for Doctor';
+}
+
+function DestinationBadge({ entry, size }: { entry: any; size: 'sm' | 'md' | 'lg' }) {
+  const msg = resolveMessage(entry);
+  const { color, Icon } = BADGE_STYLES[msg];
   const sizeClass = size === 'lg' ? 'text-base px-3 py-1 gap-1.5' : size === 'md' ? 'text-sm px-2.5 py-0.5 gap-1' : 'text-xs px-2 py-0.5 gap-1';
   const iconSize = size === 'lg' ? 'w-4 h-4' : 'w-3 h-3';
   return (
     <span className={`inline-flex items-center font-bold rounded-full shrink-0 ${color} ${sizeClass}`}>
       <Icon className={iconSize} />
-      {key}
+      {msg}
     </span>
   );
 }
@@ -172,7 +179,7 @@ export function TriageDisplay() {
                   <p className="text-gray-300 text-lg font-semibold">
                     {nowServing.patients?.full_name}
                   </p>
-                  <DestinationBadge destination={nowServing.destination_message || 'Go to Doctor'} size="lg" />
+                  <DestinationBadge entry={nowServing} size="lg" />
                 </div>
               </div>
               {nowServing.has_emergency_flag && (
@@ -214,7 +221,7 @@ export function TriageDisplay() {
                   <p className="text-gray-300 text-base font-semibold">
                     {nextUp.patients?.full_name}
                   </p>
-                  <DestinationBadge destination={nextUp.destination_message || 'Go to Doctor'} size="md" />
+                  <DestinationBadge entry={nextUp} size="md" />
                 </div>
               </div>
               {nextUp.has_emergency_flag && (
@@ -260,7 +267,7 @@ export function TriageDisplay() {
                   <span className="text-gray-400 text-sm truncate">
                     {entry.patients?.full_name}
                   </span>
-                  <DestinationBadge destination={entry.destination_message || 'Go to Doctor'} size="sm" />
+                  <DestinationBadge entry={entry} size="sm" />
                 </div>
                 {entry.has_emergency_flag && (
                   <span className="ml-auto bg-red-900/60 text-red-300 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">

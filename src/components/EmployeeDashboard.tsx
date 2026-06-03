@@ -295,11 +295,11 @@ export function EmployeeDashboard() {
                             </span>
                           </div>
                           <select
-                            value={entry.destination_message || 'Go to Doctor'}
+                            value={entry.destination_message === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor'}
                             onChange={(e) => handleSetDestination(entry.id, e.target.value)}
                             className="mt-2 text-xs border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white"
                           >
-                            <option value="Go to Doctor">Go to Doctor</option>
+                            <option value="Go to Doctor">Auto (Wait → Go to Doctor)</option>
                             <option value="Go to Theatre">Go to Theatre</option>
                           </select>
                         </div>
