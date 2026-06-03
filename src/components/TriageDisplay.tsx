@@ -3,22 +3,22 @@ import { supabase } from '../lib/supabase';
 import { AlertTriangle, Activity, Users, Clock, Stethoscope, Scissors } from 'lucide-react';
 import type { QueueEntry } from '../hooks/useQueue';
 
-export type Destination = 'Go to Doctor' | 'Go to Theatre';
-export const DEFAULT_DESTINATION: Destination = 'Go to Doctor';
+type Destination = 'Go to Doctor' | 'Go to Theatre';
 
 const BADGE_STYLES: Record<Destination, { color: string; Icon: typeof Stethoscope }> = {
   'Go to Doctor':  { color: 'bg-blue-600 text-white',  Icon: Stethoscope },
   'Go to Theatre': { color: 'bg-amber-500 text-white', Icon: Scissors    },
 };
 
-function DestinationBadge({ destination, size }: { destination: Destination; size: 'sm' | 'md' | 'lg' }) {
-  const { color, Icon } = BADGE_STYLES[destination];
+function DestinationBadge({ destination, size }: { destination: string; size: 'sm' | 'md' | 'lg' }) {
+  const key: Destination = destination === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor';
+  const { color, Icon } = BADGE_STYLES[key];
   const sizeClass = size === 'lg' ? 'text-base px-3 py-1 gap-1.5' : size === 'md' ? 'text-sm px-2.5 py-0.5 gap-1' : 'text-xs px-2 py-0.5 gap-1';
   const iconSize = size === 'lg' ? 'w-4 h-4' : 'w-3 h-3';
   return (
     <span className={`inline-flex items-center font-bold rounded-full shrink-0 ${color} ${sizeClass}`}>
       <Icon className={iconSize} />
-      {destination}
+      {key}
     </span>
   );
 }
@@ -28,28 +28,6 @@ export function TriageDisplay() {
   const [doctorStageName, setDoctorStageName] = useState('Doctor Consultation');
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [destination, setDestination] = useState<Destination>(DEFAULT_DESTINATION);
-
-  useEffect(() => {
-    supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'destination_message')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value?.message === 'Go to Theatre') setDestination('Go to Theatre');
-      });
-
-    const channel = supabase
-      .channel('destination_message_setting')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings', filter: 'key=eq.destination_message' }, (payload: any) => {
-        const msg = payload.new?.value?.message;
-        setDestination(msg === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor');
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
 
   useEffect(() => {
     fetchDoctorQueue();
@@ -96,7 +74,7 @@ export function TriageDisplay() {
 
       const { data, error } = await supabase
         .from('queue_entries')
-        .select(`*, patients(full_name, age), queue_stages(display_name, name)`)
+        .select(`*, patients(full_name, age), queue_stages(display_name, name), destination_message`)
         .eq('current_stage_id', doctorStage.id)
         .in('status', ['waiting', 'in_service'])
         .order('has_emergency_flag', { ascending: false })
@@ -194,7 +172,7 @@ export function TriageDisplay() {
                   <p className="text-gray-300 text-lg font-semibold">
                     {nowServing.patients?.full_name}
                   </p>
-                  <DestinationBadge destination={destination} size="lg" />
+                  <DestinationBadge destination={nowServing.destination_message || 'Go to Doctor'} size="lg" />
                 </div>
               </div>
               {nowServing.has_emergency_flag && (
@@ -236,7 +214,7 @@ export function TriageDisplay() {
                   <p className="text-gray-300 text-base font-semibold">
                     {nextUp.patients?.full_name}
                   </p>
-                  <DestinationBadge destination={destination} size="md" />
+                  <DestinationBadge destination={nextUp.destination_message || 'Go to Doctor'} size="md" />
                 </div>
               </div>
               {nextUp.has_emergency_flag && (
@@ -282,7 +260,7 @@ export function TriageDisplay() {
                   <span className="text-gray-400 text-sm truncate">
                     {entry.patients?.full_name}
                   </span>
-                  <DestinationBadge destination={destination} size="sm" />
+                  <DestinationBadge destination={entry.destination_message || 'Go to Doctor'} size="sm" />
                 </div>
                 {entry.has_emergency_flag && (
                   <span className="ml-auto bg-red-900/60 text-red-300 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">
