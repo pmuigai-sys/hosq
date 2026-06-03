@@ -1,13 +1,34 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { AlertTriangle, Activity, Users, Clock } from 'lucide-react';
+import { AlertTriangle, Activity, Users, Clock, Stethoscope, Scissors } from 'lucide-react';
 import type { QueueEntry } from '../hooks/useQueue';
+
+const DESTINATION_OPTIONS = [
+  { label: 'Go to Doctor',  value: 'Go to Doctor',  icon: Stethoscope, color: 'bg-blue-600 text-white', inactive: 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700' },
+  { label: 'Go to Theatre', value: 'Go to Theatre', icon: Scissors,    color: 'bg-amber-500 text-white', inactive: 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700' },
+] as const;
+
+type Destination = typeof DESTINATION_OPTIONS[number]['value'];
+
+function DestinationBadge({ destination, size }: { destination: Destination; size: 'sm' | 'md' | 'lg' }) {
+  const opt = DESTINATION_OPTIONS.find((o) => o.value === destination)!;
+  const Icon = opt.icon;
+  const sizeClass = size === 'lg' ? 'text-base px-3 py-1 gap-1.5' : size === 'md' ? 'text-sm px-2.5 py-0.5 gap-1' : 'text-xs px-2 py-0.5 gap-1';
+  const iconSize = size === 'lg' ? 'w-4 h-4' : 'w-3 h-3';
+  return (
+    <span className={`inline-flex items-center font-bold rounded-full shrink-0 ${opt.color} ${sizeClass}`}>
+      <Icon className={iconSize} />
+      {destination}
+    </span>
+  );
+}
 
 export function TriageDisplay() {
   const [doctorEntries, setDoctorEntries] = useState<QueueEntry[]>([]);
   const [doctorStageName, setDoctorStageName] = useState('Doctor Consultation');
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [destination, setDestination] = useState<Destination>('Go to Doctor');
 
   useEffect(() => {
     fetchDoctorQueue();
@@ -89,7 +110,7 @@ export function TriageDisplay() {
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-5">
           <Activity className="w-8 h-8 text-blue-400 shrink-0" />
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Queue Display</h1>
@@ -104,6 +125,28 @@ export function TriageDisplay() {
               {lastUpdated.toLocaleTimeString()}
             </p>
           </div>
+        </div>
+
+        {/* Operator: destination message selector */}
+        <div className="flex items-center gap-2 mb-6 p-3 bg-gray-800/60 rounded-xl border border-gray-700/50">
+          <span className="text-gray-500 text-xs uppercase tracking-wider shrink-0">Operator:</span>
+          <div className="flex gap-2 flex-wrap">
+            {DESTINATION_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const active = destination === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setDestination(opt.value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${active ? opt.color : opt.inactive}`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="ml-auto text-xs text-gray-500 hidden sm:block">Message shown to patients</span>
         </div>
 
         {/* Stats */}
@@ -147,9 +190,12 @@ export function TriageDisplay() {
                 >
                   {nowServing.queue_number}
                 </p>
-                <p className="text-gray-300 text-lg font-semibold mt-1">
-                  {nowServing.patients?.full_name}
-                </p>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <p className="text-gray-300 text-lg font-semibold">
+                    {nowServing.patients?.full_name}
+                  </p>
+                  <DestinationBadge destination={destination} size="lg" />
+                </div>
               </div>
               {nowServing.has_emergency_flag && (
                 <div className="ml-auto flex flex-col items-end gap-2">
@@ -186,9 +232,12 @@ export function TriageDisplay() {
                 >
                   {nextUp.queue_number}
                 </p>
-                <p className="text-gray-300 text-base font-semibold mt-1">
-                  {nextUp.patients?.full_name}
-                </p>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <p className="text-gray-300 text-base font-semibold">
+                    {nextUp.patients?.full_name}
+                  </p>
+                  <DestinationBadge destination={destination} size="md" />
+                </div>
               </div>
               {nextUp.has_emergency_flag && (
                 <div className="ml-auto flex items-center gap-2">
@@ -233,6 +282,7 @@ export function TriageDisplay() {
                   <span className="text-gray-400 text-sm truncate">
                     {entry.patients?.full_name}
                   </span>
+                  <DestinationBadge destination={destination} size="sm" />
                 </div>
                 {entry.has_emergency_flag && (
                   <span className="ml-auto bg-red-900/60 text-red-300 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">
