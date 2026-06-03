@@ -4,7 +4,7 @@ import { createConfirmedUser } from '../lib/supabase-admin';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeKenyanPhone } from '../lib/phone';
 import type { Database } from '../lib/database.types';
-import { Users, Settings, UserPlus, Shield, AlertTriangle, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { Users, Settings, UserPlus, Shield, AlertTriangle, SlidersHorizontal, RefreshCw, DatabaseZap } from 'lucide-react';
 
 type Tab = 'users' | 'stages' | 'flags' | 'ops';
 
@@ -152,6 +152,67 @@ export function AdminDashboard() {
     await refreshOps();
   };
 
+  const [seedStatus, setSeedStatus] = useState('');
+
+  const seedDemoData = async () => {
+    setSeedStatus('Seeding...');
+    try {
+      const { data: stagesData, error: stagesErr } = await supabase
+        .from('queue_stages')
+        .select('*')
+        .eq('is_active', true)
+        .order('order_number', { ascending: true })
+        .limit(1);
+      if (stagesErr) throw stagesErr;
+      const firstStage = stagesData?.[0];
+      if (!firstStage) throw new Error('No active queue stage found. Please create a stage first.');
+
+      const DEMO_PATIENTS = [
+        { name: 'James Mwangi',   phone: '+254712345001', age: 42, reason: 'Persistent headache and mild fever for 3 days, slight dizziness', emergency: false },
+        { name: 'Grace Wanjiku',  phone: '+254722345002', age: 28, reason: 'Sore throat and difficulty swallowing, mild ear pain since yesterday', emergency: false },
+        { name: 'Peter Kamau',    phone: '+254733345003', age: 55, reason: 'Lower back pain radiating to the left leg for about a week', emergency: false },
+        { name: 'Mary Akinyi',    phone: '+254711345004', age: 34, reason: 'Skin rash on arms and torso with moderate itching', emergency: false },
+        { name: 'David Omondi',   phone: '+254720345005', age: 19, reason: 'Stomach cramps and nausea after eating, no vomiting', emergency: false },
+        { name: 'Fatuma Hassan',  phone: '+254701345006', age: 61, reason: 'Swollen right ankle after a fall this morning, pain when walking', emergency: false },
+        { name: 'Samuel Njoroge', phone: '+254725345007', age: 47, reason: 'Persistent dry cough and mild shortness of breath for two weeks', emergency: false },
+        { name: 'Agnes Chebet',   phone: '+254714345008', age: 23, reason: 'Irregular menstrual cycle and lower abdominal discomfort', emergency: false },
+        { name: 'Brian Otieno',   phone: '+254715345009', age: 38, reason: 'Severe chest pain radiating to left arm and jaw, heavy sweating and feeling faint', emergency: true },
+        { name: 'Rose Wambui',    phone: '+254718345010', age: 72, reason: 'Sudden severe headache, left-side facial drooping, slurred speech and confusion', emergency: true },
+      ];
+
+      const now = Date.now();
+      for (let i = 0; i < DEMO_PATIENTS.length; i++) {
+        const p = DEMO_PATIENTS[i];
+        const checkedInAt = new Date(now - (DEMO_PATIENTS.length - i) * 5 * 60 * 1000).toISOString();
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const qNum = `Q${dateStr}-${String(1000 + i).padStart(4, '0')}`;
+
+        const { data: patient, error: patErr } = await supabase
+          .from('patients')
+          .insert({ phone_number: p.phone, full_name: p.name, age: p.age, visit_reason: p.reason })
+          .select('id')
+          .single();
+        if (patErr) throw patErr;
+
+        const position = p.emergency ? i + 1 : null;
+        await supabase.from('queue_entries').insert({
+          patient_id: patient.id,
+          current_stage_id: firstStage.id,
+          queue_number: qNum,
+          status: 'waiting',
+          has_emergency_flag: p.emergency,
+          checked_in_at: checkedInAt,
+          position_in_queue: position,
+          notes: p.emergency ? 'Auto-flagged: high-priority symptoms' : null,
+        });
+      }
+
+      setSeedStatus('10 demo patients seeded — 2 marked as emergency and will appear at the top of the queue.');
+    } catch (err: any) {
+      setSeedStatus(`Error: ${err.message}`);
+    }
+  };
+
   const sendTestSms = async () => {
     setTestSmsStatus('');
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-sms`, {
@@ -217,6 +278,16 @@ export function AdminDashboard() {
                   <button onClick={refreshOps} disabled={refreshingOps} className="px-3 py-2 rounded-lg bg-gray-100"><RefreshCw className={`w-4 h-4 inline mr-2 ${refreshingOps ? 'animate-spin' : ''}`} />Refresh</button>
                 </div>
                 <div className="p-3 rounded-lg border bg-gray-50 text-sm">{smsHealth}</div>
+                <div className="p-4 border border-dashed border-purple-300 bg-purple-50 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1">
+                    <p className="font-semibold text-purple-900">Seed Demo Data</p>
+                    <p className="text-sm text-purple-700">Adds 10 fake patients to the queue (8 regular, 2 emergency) for demonstration purposes.</p>
+                    {seedStatus && <p className="text-sm mt-1 font-medium text-purple-800">{seedStatus}</p>}
+                  </div>
+                  <button onClick={seedDemoData} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors whitespace-nowrap">
+                    <DatabaseZap className="w-4 h-4" />Seed Demo Data
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="p-4 border rounded-lg">
                     <p className="font-semibold mb-2">Global SMS Switch</p>
