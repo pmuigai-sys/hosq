@@ -98,7 +98,7 @@ export function TriageDisplay() {
     }
   };
 
-  const nowServing = doctorEntries.find((e) => e.status === 'in_service');
+  const nowServing = doctorEntries.filter((e) => e.status === 'in_service').sort((a, b) => (a.doctor_room ?? 99) - (b.doctor_room ?? 99));
   const waiting = doctorEntries.filter((e) => e.status === 'waiting');
   const nextUp = waiting[0];
   const upNext = waiting.slice(1, 6);
@@ -142,7 +142,7 @@ export function TriageDisplay() {
           </div>
           <div className="bg-gray-800 rounded-xl p-4 text-center">
             <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">With Doctor</p>
-            <p className="text-4xl font-black text-green-400">{nowServing ? 1 : 0}</p>
+            <p className="text-4xl font-black text-green-400">{nowServing.length}</p>
           </div>
           <div className="bg-red-950/60 border border-red-800/40 rounded-xl p-4 text-center">
             <p className="text-red-400 text-xs uppercase tracking-wider mb-1">Priority</p>
@@ -153,46 +153,44 @@ export function TriageDisplay() {
         </div>
 
         {/* Now Serving */}
-        <div
-          className={`rounded-2xl p-6 mb-5 border-2 transition-colors ${
-            nowServing
-              ? nowServing.has_emergency_flag
-                ? 'bg-red-950/50 border-red-500'
-                : 'bg-green-950/50 border-green-500'
-              : 'bg-gray-800 border-gray-700'
-          }`}
-        >
+        <div className="mb-5">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
             Now With Doctor
           </p>
-          {nowServing ? (
-            <div className="flex items-center gap-4">
-              <div>
-                <p
-                  className={`text-5xl font-black ${
-                    nowServing.has_emergency_flag ? 'text-red-400' : 'text-green-400'
-                  }`}
-                >
-                  {nowServing.queue_number}
-                </p>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <p className="text-gray-300 text-lg font-semibold">
-                    {nowServing.patients?.full_name}
-                  </p>
-                  <DestinationBadge entry={nowServing} size="lg" />
-                </div>
-              </div>
-              {nowServing.has_emergency_flag && (
-                <div className="ml-auto flex flex-col items-end gap-2">
-                  <AlertTriangle className="w-10 h-10 text-red-400 animate-pulse" />
-                  <span className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                    Priority
-                  </span>
-                </div>
-              )}
+          {nowServing.length === 0 ? (
+            <div className="rounded-2xl p-6 border-2 bg-gray-800 border-gray-700">
+              <p className="text-gray-500 text-lg">No patient currently with doctor</p>
             </div>
           ) : (
-            <p className="text-gray-500 text-lg">No patient currently with doctor</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {nowServing.map((entry) => (
+                <div
+                  key={entry.id}
+                  className={`rounded-2xl p-5 border-2 transition-colors ${
+                    entry.has_emergency_flag
+                      ? 'bg-red-950/50 border-red-500'
+                      : 'bg-green-950/50 border-green-500'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-4xl font-black ${entry.has_emergency_flag ? 'text-red-400' : 'text-green-400'}`}>
+                        {entry.queue_number}
+                      </p>
+                      <p className="text-gray-300 text-base font-semibold mt-1 truncate">
+                        {entry.patients?.full_name}
+                      </p>
+                      <div className="mt-2">
+                        <DestinationBadge entry={entry} size="md" />
+                      </div>
+                    </div>
+                    {entry.has_emergency_flag && (
+                      <AlertTriangle className="w-6 h-6 text-red-400 animate-pulse shrink-0 mt-1" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
