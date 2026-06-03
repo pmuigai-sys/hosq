@@ -3,14 +3,8 @@ import { supabase } from '../lib/supabase';
 import { AlertTriangle, Activity, Users, Clock, Stethoscope, Scissors } from 'lucide-react';
 import type { QueueEntry } from '../hooks/useQueue';
 
-export const DESTINATION_STORAGE_KEY = 'hosq_destination_message';
 export type Destination = 'Go to Doctor' | 'Go to Theatre';
 export const DEFAULT_DESTINATION: Destination = 'Go to Doctor';
-
-function readDestination(): Destination {
-  const stored = localStorage.getItem(DESTINATION_STORAGE_KEY);
-  return stored === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor';
-}
 
 const BADGE_STYLES: Record<Destination, { color: string; Icon: typeof Stethoscope }> = {
   'Go to Doctor':  { color: 'bg-blue-600 text-white',  Icon: Stethoscope },
@@ -34,14 +28,27 @@ export function TriageDisplay() {
   const [doctorStageName, setDoctorStageName] = useState('Doctor Consultation');
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [destination, setDestination] = useState<Destination>(readDestination);
+  const [destination, setDestination] = useState<Destination>(DEFAULT_DESTINATION);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === DESTINATION_STORAGE_KEY) setDestination(readDestination());
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'destination_message')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value?.message === 'Go to Theatre') setDestination('Go to Theatre');
+      });
+
+    const channel = supabase
+      .channel('destination_message_setting')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings', filter: 'key=eq.destination_message' }, (payload: any) => {
+        const msg = payload.new?.value?.message;
+        setDestination(msg === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor');
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {

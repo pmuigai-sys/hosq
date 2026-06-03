@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQueueEntries, useQueueStages, useEmergencyFlags } from '../hooks/useQueue';
 import { supabase } from '../lib/supabase';
 import { notifyPatientStageChange, notifyPatientCalled, notifyPositionChange } from '../lib/sms';
-import { DESTINATION_STORAGE_KEY, DEFAULT_DESTINATION } from './TriageDisplay';
+import { DEFAULT_DESTINATION } from './TriageDisplay';
 import type { Destination } from './TriageDisplay';
 import {
   Users,
@@ -25,13 +25,25 @@ export function EmployeeDashboard() {
   const [showCompleted, setShowCompleted] = useState(false);
   const { entries, refresh } = useQueueEntries(selectedStage || undefined, 'all');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [destination, setDestinationState] = useState<Destination>(
-    () => (localStorage.getItem(DESTINATION_STORAGE_KEY) as Destination) || DEFAULT_DESTINATION
-  );
+  const [destination, setDestinationState] = useState<Destination>(DEFAULT_DESTINATION);
 
-  const setDestination = (val: Destination) => {
-    localStorage.setItem(DESTINATION_STORAGE_KEY, val);
+  useEffect(() => {
+    supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'destination_message')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value?.message === 'Go to Theatre') setDestinationState('Go to Theatre');
+      });
+  }, []);
+
+  const setDestination = async (val: Destination) => {
     setDestinationState(val);
+    await (supabase as any).from('system_settings').upsert(
+      { key: 'destination_message', value: { message: val }, updated_at: new Date().toISOString(), updated_by_user_id: userRole?.user_id || null },
+      { onConflict: 'key' }
+    );
   };
   const activeEntries = entries.filter((entry) => entry.status !== 'completed' && entry.status !== 'cancelled');
   const visibleEntries = showCompleted ? entries : activeEntries;
