@@ -13,6 +13,7 @@ export interface QueueEntry {
   checked_in_at: string;
   notes: string | null;
   destination_message: string;
+  doctor_room: number | null;
   patients?: {
     full_name: string;
     phone_number: string;

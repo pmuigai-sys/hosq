@@ -3,29 +3,29 @@ import { supabase } from '../lib/supabase';
 import { AlertTriangle, Activity, Users, Clock, Stethoscope, Scissors } from 'lucide-react';
 import type { QueueEntry } from '../hooks/useQueue';
 
-type DisplayMessage = 'Wait for Doctor' | 'Go to Doctor' | 'Go to Theatre';
-
-const BADGE_STYLES: Record<DisplayMessage, { color: string; Icon: typeof Stethoscope }> = {
-  'Wait for Doctor': { color: 'bg-yellow-500 text-white', Icon: Clock        },
-  'Go to Doctor':    { color: 'bg-green-600 text-white',  Icon: Stethoscope  },
-  'Go to Theatre':   { color: 'bg-purple-600 text-white', Icon: Scissors     },
-};
-
-function resolveMessage(entry: any): DisplayMessage {
-  if (entry.destination_message === 'Go to Theatre') return 'Go to Theatre';
-  if (entry.status === 'in_service') return 'Go to Doctor';
-  return 'Wait for Doctor';
+function resolveMessage(entry: any): { text: string; color: string; Icon: typeof Stethoscope } {
+  if (entry.destination_message === 'Go to Theatre') {
+    return { text: 'Go to Theatre', color: 'bg-purple-600 text-white', Icon: Scissors };
+  }
+  if (entry.status === 'in_service') {
+    const room = entry.doctor_room;
+    return {
+      text: room ? `Go to Doctor Room ${room}` : 'Go to Doctor',
+      color: 'bg-green-600 text-white',
+      Icon: Stethoscope,
+    };
+  }
+  return { text: 'Wait for Doctor', color: 'bg-yellow-500 text-white', Icon: Clock };
 }
 
 function DestinationBadge({ entry, size }: { entry: any; size: 'sm' | 'md' | 'lg' }) {
-  const msg = resolveMessage(entry);
-  const { color, Icon } = BADGE_STYLES[msg];
+  const { text, color, Icon } = resolveMessage(entry);
   const sizeClass = size === 'lg' ? 'text-base px-3 py-1 gap-1.5' : size === 'md' ? 'text-sm px-2.5 py-0.5 gap-1' : 'text-xs px-2 py-0.5 gap-1';
   const iconSize = size === 'lg' ? 'w-4 h-4' : 'w-3 h-3';
   return (
     <span className={`inline-flex items-center font-bold rounded-full shrink-0 ${color} ${sizeClass}`}>
       <Icon className={iconSize} />
-      {msg}
+      {text}
     </span>
   );
 }
@@ -81,7 +81,7 @@ export function TriageDisplay() {
 
       const { data, error } = await supabase
         .from('queue_entries')
-        .select(`*, patients(full_name, age), queue_stages(display_name, name), destination_message`)
+        .select(`*, patients(full_name, age), queue_stages(display_name, name), destination_message, doctor_room`)
         .eq('current_stage_id', doctorStage.id)
         .in('status', ['waiting', 'in_service'])
         .order('has_emergency_flag', { ascending: false })

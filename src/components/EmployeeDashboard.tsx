@@ -38,9 +38,25 @@ export function EmployeeDashboard() {
       const entry = entries.find((e) => e.id === entryId);
       if (!entry) return;
 
+      // Find the lowest available doctor room (1-5)
+      const doctorStage = stages.find((s) => s.name === 'doctor');
+      let assignedRoom: number | null = null;
+      if (doctorStage && entry.current_stage_id === doctorStage.id) {
+        const { data: inService } = await supabase
+          .from('queue_entries')
+          .select('doctor_room')
+          .eq('current_stage_id', doctorStage.id)
+          .eq('status', 'in_service')
+          .not('doctor_room', 'is', null);
+        const takenRooms = new Set((inService || []).map((e: any) => e.doctor_room));
+        for (let r = 1; r <= 5; r++) {
+          if (!takenRooms.has(r)) { assignedRoom = r; break; }
+        }
+      }
+
       await supabase
         .from('queue_entries')
-        .update({ status: 'in_service' })
+        .update({ status: 'in_service', ...(assignedRoom ? { doctor_room: assignedRoom } : {}) })
         .eq('id', entryId);
 
       const stageId = entry.current_stage_id || selectedStage;
@@ -87,6 +103,7 @@ export function EmployeeDashboard() {
           .update({
             current_stage_id: nextStage.id,
             status: 'waiting',
+            doctor_room: null,
           })
           .eq('id', entryId);
 
@@ -106,6 +123,7 @@ export function EmployeeDashboard() {
           .update({
             status: 'completed',
             completed_at: new Date().toISOString(),
+            doctor_room: null,
           })
           .eq('id', entryId);
       }
