@@ -3,20 +3,26 @@ import { supabase } from '../lib/supabase';
 import { AlertTriangle, Activity, Users, Clock, Stethoscope, Scissors } from 'lucide-react';
 import type { QueueEntry } from '../hooks/useQueue';
 
-const DESTINATION_OPTIONS = [
-  { label: 'Go to Doctor',  value: 'Go to Doctor',  icon: Stethoscope, color: 'bg-blue-600 text-white', inactive: 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700' },
-  { label: 'Go to Theatre', value: 'Go to Theatre', icon: Scissors,    color: 'bg-amber-500 text-white', inactive: 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700' },
-] as const;
+export const DESTINATION_STORAGE_KEY = 'hosq_destination_message';
+export type Destination = 'Go to Doctor' | 'Go to Theatre';
+export const DEFAULT_DESTINATION: Destination = 'Go to Doctor';
 
-type Destination = typeof DESTINATION_OPTIONS[number]['value'];
+function readDestination(): Destination {
+  const stored = localStorage.getItem(DESTINATION_STORAGE_KEY);
+  return stored === 'Go to Theatre' ? 'Go to Theatre' : 'Go to Doctor';
+}
+
+const BADGE_STYLES: Record<Destination, { color: string; Icon: typeof Stethoscope }> = {
+  'Go to Doctor':  { color: 'bg-blue-600 text-white',  Icon: Stethoscope },
+  'Go to Theatre': { color: 'bg-amber-500 text-white', Icon: Scissors    },
+};
 
 function DestinationBadge({ destination, size }: { destination: Destination; size: 'sm' | 'md' | 'lg' }) {
-  const opt = DESTINATION_OPTIONS.find((o) => o.value === destination)!;
-  const Icon = opt.icon;
+  const { color, Icon } = BADGE_STYLES[destination];
   const sizeClass = size === 'lg' ? 'text-base px-3 py-1 gap-1.5' : size === 'md' ? 'text-sm px-2.5 py-0.5 gap-1' : 'text-xs px-2 py-0.5 gap-1';
   const iconSize = size === 'lg' ? 'w-4 h-4' : 'w-3 h-3';
   return (
-    <span className={`inline-flex items-center font-bold rounded-full shrink-0 ${opt.color} ${sizeClass}`}>
+    <span className={`inline-flex items-center font-bold rounded-full shrink-0 ${color} ${sizeClass}`}>
       <Icon className={iconSize} />
       {destination}
     </span>
@@ -28,7 +34,15 @@ export function TriageDisplay() {
   const [doctorStageName, setDoctorStageName] = useState('Doctor Consultation');
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [destination, setDestination] = useState<Destination>('Go to Doctor');
+  const [destination, setDestination] = useState<Destination>(readDestination);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === DESTINATION_STORAGE_KEY) setDestination(readDestination());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   useEffect(() => {
     fetchDoctorQueue();
@@ -110,7 +124,7 @@ export function TriageDisplay() {
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-8">
           <Activity className="w-8 h-8 text-blue-400 shrink-0" />
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Queue Display</h1>
@@ -127,27 +141,6 @@ export function TriageDisplay() {
           </div>
         </div>
 
-        {/* Operator: destination message selector */}
-        <div className="flex items-center gap-2 mb-6 p-3 bg-gray-800/60 rounded-xl border border-gray-700/50">
-          <span className="text-gray-500 text-xs uppercase tracking-wider shrink-0">Operator:</span>
-          <div className="flex gap-2 flex-wrap">
-            {DESTINATION_OPTIONS.map((opt) => {
-              const Icon = opt.icon;
-              const active = destination === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => setDestination(opt.value)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${active ? opt.color : opt.inactive}`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          <span className="ml-auto text-xs text-gray-500 hidden sm:block">Message shown to patients</span>
-        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-8">

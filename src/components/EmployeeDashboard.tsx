@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useQueueEntries, useQueueStages, useEmergencyFlags } from '../hooks/useQueue';
 import { supabase } from '../lib/supabase';
 import { notifyPatientStageChange, notifyPatientCalled, notifyPositionChange } from '../lib/sms';
+import { DESTINATION_STORAGE_KEY, DEFAULT_DESTINATION } from './TriageDisplay';
+import type { Destination } from './TriageDisplay';
 import {
   Users,
   Clock,
@@ -11,6 +13,8 @@ import {
   AlertTriangle,
   Phone,
   User,
+  Stethoscope,
+  Scissors,
 } from 'lucide-react';
 
 export function EmployeeDashboard() {
@@ -21,6 +25,14 @@ export function EmployeeDashboard() {
   const [showCompleted, setShowCompleted] = useState(false);
   const { entries, refresh } = useQueueEntries(selectedStage || undefined, 'all');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [destination, setDestinationState] = useState<Destination>(
+    () => (localStorage.getItem(DESTINATION_STORAGE_KEY) as Destination) || DEFAULT_DESTINATION
+  );
+
+  const setDestination = (val: Destination) => {
+    localStorage.setItem(DESTINATION_STORAGE_KEY, val);
+    setDestinationState(val);
+  };
   const activeEntries = entries.filter((entry) => entry.status !== 'completed' && entry.status !== 'cancelled');
   const visibleEntries = showCompleted ? entries : activeEntries;
 
@@ -189,6 +201,28 @@ export function EmployeeDashboard() {
               </div>
               <CheckCircle className="w-8 h-8 text-gray-600" />
             </div>
+          </div>
+        </div>
+
+        {/* Queue Display message — operator only, not shown to patients */}
+        <div className="bg-white rounded-lg shadow mb-4 sm:mb-6 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Queue Display Message</p>
+            <p className="text-xs text-gray-500">Sets the instruction shown on the public display screen</p>
+          </div>
+          <div className="flex gap-2 sm:ml-auto">
+            <button
+              onClick={() => setDestination('Go to Doctor')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${destination === 'Go to Doctor' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              <Stethoscope className="w-4 h-4" />Go to Doctor
+            </button>
+            <button
+              onClick={() => setDestination('Go to Theatre')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${destination === 'Go to Theatre' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              <Scissors className="w-4 h-4" />Go to Theatre
+            </button>
           </div>
         </div>
 
